@@ -5,7 +5,23 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
+import {
+  Select as SelectShadcn,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/SelectShadcn";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/AlertDialog";
 import { Plus, Edit, Trash2, ShoppingCart } from "lucide-react";
 import { getOrders, deleteOrder } from "@/features/orders/actions";
 import type { OrderWithEmployee } from "@/features/orders/types";
@@ -22,6 +38,8 @@ export default function OrdersPage() {
     "all" | "pending" | "in_progress" | "paid" | "cancelled"
   >("all");
   const [sortBy, setSortBy] = useState("created_at-desc");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -50,19 +68,22 @@ export default function OrdersPage() {
   }, [searchQuery, statusFilter, sortBy]);
 
   const handleDelete = async (orderId: string) => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this order? This action cannot be undone.",
-      )
-    ) {
-      return;
-    }
+    setOrderToDelete(orderId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!orderToDelete) return;
 
     try {
-      await deleteOrder(orderId);
+      await deleteOrder(orderToDelete);
+      setDeleteDialogOpen(false);
+      setOrderToDelete(null);
       loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete order");
+      setDeleteDialogOpen(false);
+      setOrderToDelete(null);
     }
   };
 
@@ -117,11 +138,11 @@ export default function OrdersPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-64"
               />
-              <Select
+              <SelectShadcn
                 value={statusFilter}
-                onChange={(e) =>
+                onValueChange={(value) =>
                   setStatusFilter(
-                    e.target.value as
+                    value as
                       | "all"
                       | "pending"
                       | "in_progress"
@@ -129,25 +150,39 @@ export default function OrdersPage() {
                       | "cancelled",
                   )
                 }
-                options={[
-                  { value: "all", label: "All Status" },
-                  { value: "pending", label: "Pending" },
-                  { value: "in_progress", label: "In Progress" },
-                  { value: "paid", label: "Paid" },
-                  { value: "cancelled", label: "Cancelled" },
-                ]}
-              />
-              <Select
+              >
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </SelectShadcn>
+              <SelectShadcn
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                options={[
-                  { value: "created_at-desc", label: "Newest First" },
-                  { value: "created_at-asc", label: "Oldest First" },
-                  { value: "order_date-desc", label: "Order Date (Newest)" },
-                  { value: "order_date-asc", label: "Order Date (Oldest)" },
-                  { value: "order_number-asc", label: "Order Number (A-Z)" },
-                ]}
-              />
+                onValueChange={(value) => setSortBy(value)}
+              >
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="created_at-desc">Newest First</SelectItem>
+                  <SelectItem value="created_at-asc">Oldest First</SelectItem>
+                  <SelectItem value="order_date-desc">
+                    Order Date (Newest)
+                  </SelectItem>
+                  <SelectItem value="order_date-asc">
+                    Order Date (Oldest)
+                  </SelectItem>
+                  <SelectItem value="order_number-asc">
+                    Order Number (A-Z)
+                  </SelectItem>
+                </SelectContent>
+              </SelectShadcn>
             </div>
           </div>
         </CardHeader>
@@ -262,6 +297,24 @@ export default function OrdersPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Order</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this order? This action cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
