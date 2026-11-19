@@ -1,11 +1,19 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/server";
 import type { InventoryItem, Warehouse } from "./types";
 import { revalidatePath } from "next/cache";
+import {
+  InventoryItemSchema,
+  InventoryItemUpdateSchema,
+  WarehouseSchema,
+  WarehouseUpdateSchema,
+  AdjustInventorySchema,
+  TransferInventorySchema,
+} from "@/lib/validations";
 
 export async function getInventoryItems(search?: string, sortBy?: string) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   let query = supabase
     .from("inventory_items")
@@ -37,7 +45,7 @@ export async function getInventoryItems(search?: string, sortBy?: string) {
 }
 
 export async function getInventoryItem(id: string) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("inventory_items")
@@ -56,11 +64,17 @@ export async function getInventoryItem(id: string) {
 export async function createInventoryItem(
   item: Omit<InventoryItem, "id" | "created_at">,
 ) {
-  const supabase = createClient();
+  // Validate input using Zod schema
+  const validationResult = InventoryItemSchema.safeParse(item);
+  if (!validationResult.success) {
+    throw new Error(validationResult.error.issues[0].message);
+  }
+
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("inventory_items")
-    .insert(item)
+    .insert(validationResult.data)
     .select()
     .single();
 
@@ -77,11 +91,20 @@ export async function updateInventoryItem(
   id: string,
   item: Partial<Omit<InventoryItem, "id" | "created_at">>,
 ) {
-  const supabase = createClient();
+  // Validate input using Zod schema
+  const validationResult = InventoryItemUpdateSchema.safeParse({
+    id,
+    ...item,
+  });
+  if (!validationResult.success) {
+    throw new Error(validationResult.error.issues[0].message);
+  }
+
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("inventory_items")
-    .update(item)
+    .update(validationResult.data)
     .eq("id", id)
     .select()
     .single();
@@ -97,7 +120,7 @@ export async function updateInventoryItem(
 }
 
 export async function deleteInventoryItem(id: string) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { error } = await supabase
     .from("inventory_items")
@@ -113,7 +136,7 @@ export async function deleteInventoryItem(id: string) {
 }
 
 export async function getWarehouses(search?: string) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   let query = supabase
     .from("warehouses")
@@ -135,7 +158,7 @@ export async function getWarehouses(search?: string) {
 }
 
 export async function getWarehouse(id: string) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("warehouses")
@@ -154,11 +177,17 @@ export async function getWarehouse(id: string) {
 export async function createWarehouse(
   warehouse: Omit<Warehouse, "id" | "created_at">,
 ) {
-  const supabase = createClient();
+  // Validate input using Zod schema
+  const validationResult = WarehouseSchema.safeParse(warehouse);
+  if (!validationResult.success) {
+    throw new Error(validationResult.error.issues[0].message);
+  }
+
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("warehouses")
-    .insert(warehouse)
+    .insert(validationResult.data)
     .select()
     .single();
 
@@ -175,11 +204,20 @@ export async function updateWarehouse(
   id: string,
   warehouse: Partial<Omit<Warehouse, "id" | "created_at">>,
 ) {
-  const supabase = createClient();
+  // Validate input using Zod schema
+  const validationResult = WarehouseUpdateSchema.safeParse({
+    id,
+    ...warehouse,
+  });
+  if (!validationResult.success) {
+    throw new Error(validationResult.error.issues[0].message);
+  }
+
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("warehouses")
-    .update(warehouse)
+    .update(validationResult.data)
     .eq("id", id)
     .select()
     .single();
@@ -195,7 +233,7 @@ export async function updateWarehouse(
 }
 
 export async function deleteWarehouse(id: string) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   // Check if warehouse has stock
   const { data: stockData } = await supabase
@@ -222,7 +260,7 @@ export async function getInventorySummary(filters?: {
   item_id?: string;
   warehouse_id?: string;
 }) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   let query = supabase
     .from("inventory_summary")
@@ -254,15 +292,24 @@ export async function adjustInventory(
   quantity: number,
   notes?: string,
 ) {
-  const supabase = createClient();
-
-  const { data, error } = await supabase.rpc("adjust_inventory", {
+  // Validate input using Zod schema
+  const validationResult = AdjustInventorySchema.safeParse({
     p_item_id: itemId,
     p_warehouse_id: warehouseId,
     p_activity: activity,
     p_quantity: quantity,
     p_notes: notes,
   });
+  if (!validationResult.success) {
+    throw new Error(validationResult.error.issues[0].message);
+  }
+
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.rpc(
+    "adjust_inventory",
+    validationResult.data,
+  );
 
   if (error) {
     console.error("Error adjusting inventory:", error);
@@ -282,15 +329,24 @@ export async function transferInventory(
   quantity: number,
   notes?: string,
 ) {
-  const supabase = createClient();
-
-  const { data, error } = await supabase.rpc("transfer_inventory", {
+  // Validate input using Zod schema
+  const validationResult = TransferInventorySchema.safeParse({
     p_item_id: itemId,
     p_source_warehouse_id: sourceWarehouseId,
     p_destination_warehouse_id: destinationWarehouseId,
     p_quantity: quantity,
     p_notes: notes,
   });
+  if (!validationResult.success) {
+    throw new Error(validationResult.error.issues[0].message);
+  }
+
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.rpc(
+    "transfer_inventory",
+    validationResult.data,
+  );
 
   if (error) {
     console.error("Error transferring inventory:", error);
@@ -309,7 +365,7 @@ export async function getInventoryActivityLogs(filters?: {
   warehouse_id?: string;
   activity_type?: string;
 }) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   let query = supabase
     .from("inventory_activity_logs")
@@ -361,7 +417,7 @@ export async function getWarehouseTransfers(filters?: {
   source_warehouse_id?: string;
   destination_warehouse_id?: string;
 }) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   let query = supabase
     .from("warehouse_transfers")
@@ -402,7 +458,7 @@ export async function getWarehouseTransfers(filters?: {
 }
 
 export async function getWarehouseStock(warehouseId: string) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("inventory_summary")

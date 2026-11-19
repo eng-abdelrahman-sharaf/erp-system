@@ -2,7 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
-import { Select } from "@/components/ui/Select";
+import {
+  Select as SelectShadcn,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/SelectShadcn";
 import { Table } from "@/components/ui/Table";
 import { Package } from "lucide-react";
 import {
@@ -96,22 +102,52 @@ export default function StockOverviewPage() {
       </div>
 
       <div className="mb-4 flex gap-4">
-        <Select
-          label="Filter by Item"
-          options={[{ value: "", label: "All Items" }, ...items]}
-          value={filters.item_id}
-          onChange={(e) =>
-            setFilters((prev) => ({ ...prev, item_id: e.target.value }))
-          }
-        />
-        <Select
-          label="Filter by Warehouse"
-          options={[{ value: "", label: "All Warehouses" }, ...warehouses]}
-          value={filters.warehouse_id}
-          onChange={(e) =>
-            setFilters((prev) => ({ ...prev, warehouse_id: e.target.value }))
-          }
-        />
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-gray-700">
+            Filter by Item
+          </label>
+          <SelectShadcn
+            value={filters.item_id}
+            onValueChange={(value) =>
+              setFilters((prev) => ({ ...prev, item_id: value }))
+            }
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="All Items" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Items</SelectItem>
+              {items.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </SelectShadcn>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-gray-700">
+            Filter by Warehouse
+          </label>
+          <SelectShadcn
+            value={filters.warehouse_id}
+            onValueChange={(value) =>
+              setFilters((prev) => ({ ...prev, warehouse_id: value }))
+            }
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="All Warehouses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Warehouses</SelectItem>
+              {warehouses.map((wh) => (
+                <SelectItem key={wh.value} value={wh.value}>
+                  {wh.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </SelectShadcn>
+        </div>
       </div>
 
       {loading ? (

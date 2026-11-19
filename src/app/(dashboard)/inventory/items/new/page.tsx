@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { ArrowLeft } from "lucide-react";
 import { createInventoryItem } from "@/features/inventory/actions";
 import Link from "next/link";
+import { InventoryItemCreateSchema } from "@/lib/validations";
 
 export default function NewInventoryItemPage() {
   const router = useRouter();
@@ -31,13 +33,16 @@ export default function NewInventoryItemPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const newErrors: Record<string, string> = {};
 
-    if (!formData.name.trim()) newErrors.name = "Name is required";
-    if (!formData.sku.trim()) newErrors.sku = "SKU is required";
-    if (!formData.unit.trim()) newErrors.unit = "Unit is required";
-
-    if (Object.keys(newErrors).length > 0) {
+    // Validate using Zod schema
+    const validationResult = InventoryItemCreateSchema.safeParse(formData);
+    if (!validationResult.success) {
+      const newErrors: Record<string, string> = {};
+      validationResult.error.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          newErrors[issue.path[0] as string] = issue.message;
+        }
+      });
       setErrors(newErrors);
       return;
     }
@@ -45,9 +50,12 @@ export default function NewInventoryItemPage() {
     setLoading(true);
     try {
       await createInventoryItem(formData);
+      toast.success("Inventory item created successfully");
       router.push("/inventory");
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to create item");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create item",
+      );
     } finally {
       setLoading(false);
     }

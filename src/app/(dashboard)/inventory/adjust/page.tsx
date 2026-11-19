@@ -2,9 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
+import {
+  Select as SelectShadcn,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/SelectShadcn";
 import { ArrowLeft } from "lucide-react";
 import {
   adjustInventory,
@@ -46,9 +53,7 @@ export default function StockAdjustPage() {
   }, []);
 
   function handleChange(
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >,
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -81,9 +86,12 @@ export default function StockAdjustPage() {
         parseFloat(formData.quantity),
         formData.notes || undefined,
       );
+      toast.success("Stock adjusted successfully");
       router.push("/inventory/stock");
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to adjust stock");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to adjust stock",
+      );
     } finally {
       setLoading(false);
     }
@@ -102,37 +110,84 @@ export default function StockAdjustPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
-        <Select
-          label="Item"
-          name="item_id"
-          options={[{ value: "", label: "Select an item" }, ...items]}
-          value={formData.item_id}
-          onChange={handleChange}
-          error={errors.item_id}
-          required
-        />
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-gray-700">
+            Item <span className="text-red-500">*</span>
+          </label>
+          <SelectShadcn
+            value={formData.item_id}
+            onValueChange={(value) => {
+              setFormData((prev) => ({ ...prev, item_id: value }));
+              if (errors.item_id)
+                setErrors((prev) => ({ ...prev, item_id: "" }));
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select an item" />
+            </SelectTrigger>
+            <SelectContent>
+              {items.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </SelectShadcn>
+          {errors.item_id && (
+            <span className="text-sm text-red-600">{errors.item_id}</span>
+          )}
+        </div>
 
-        <Select
-          label="Warehouse"
-          name="warehouse_id"
-          options={[{ value: "", label: "Select a warehouse" }, ...warehouses]}
-          value={formData.warehouse_id}
-          onChange={handleChange}
-          error={errors.warehouse_id}
-          required
-        />
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-gray-700">
+            Warehouse <span className="text-red-500">*</span>
+          </label>
+          <SelectShadcn
+            value={formData.warehouse_id}
+            onValueChange={(value) => {
+              setFormData((prev) => ({ ...prev, warehouse_id: value }));
+              if (errors.warehouse_id)
+                setErrors((prev) => ({ ...prev, warehouse_id: "" }));
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select a warehouse" />
+            </SelectTrigger>
+            <SelectContent>
+              {warehouses.map((wh) => (
+                <SelectItem key={wh.value} value={wh.value}>
+                  {wh.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </SelectShadcn>
+          {errors.warehouse_id && (
+            <span className="text-sm text-red-600">{errors.warehouse_id}</span>
+          )}
+        </div>
 
-        <Select
-          label="Activity Type"
-          name="activity_type"
-          options={[
-            { value: "addition", label: "Add Stock" },
-            { value: "manual_usage", label: "Manual Usage" },
-          ]}
-          value={formData.activity_type}
-          onChange={handleChange}
-          required
-        />
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-gray-700">
+            Activity Type <span className="text-red-500">*</span>
+          </label>
+          <SelectShadcn
+            value={formData.activity_type}
+            onValueChange={(value) => {
+              setFormData((prev) => ({
+                ...prev,
+                activity_type: value as "addition" | "manual_usage",
+              }));
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select activity type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="addition">Add Stock</SelectItem>
+              <SelectItem value="manual_usage">Manual Usage</SelectItem>
+            </SelectContent>
+          </SelectShadcn>
+        </div>
 
         <Input
           label="Quantity"

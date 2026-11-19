@@ -1,9 +1,27 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import {
+  Select as SelectShadcn,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/SelectShadcn";
 import { Table } from "@/components/ui/Table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/AlertDialog";
 import { Plus, Search, Package } from "lucide-react";
 import {
   getInventoryItems,
@@ -17,6 +35,7 @@ export default function InventoryPage() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("created_at-desc");
   const [loading, setLoading] = useState(true);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   async function loadItems() {
     setLoading(true);
@@ -31,12 +50,21 @@ export default function InventoryPage() {
   }, [search, sortBy]);
 
   async function handleDelete(id: string) {
-    if (!confirm("Are you sure you want to delete this item?")) return;
+    setDeleteId(id);
+  }
+
+  async function confirmDelete() {
+    if (!deleteId) return;
     try {
-      await deleteInventoryItem(id);
+      await deleteInventoryItem(deleteId);
       loadItems();
+      toast.success("Item deleted successfully");
+      setDeleteId(null);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to delete item");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete item",
+      );
+      setDeleteId(null);
     }
   }
 
@@ -98,18 +126,22 @@ export default function InventoryPage() {
             className="pl-10"
           />
         </div>
-        <select
+        <SelectShadcn
           value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          className="h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+          onValueChange={(value) => setSortBy(value)}
         >
-          <option value="created_at-desc">Newest First</option>
-          <option value="created_at-asc">Oldest First</option>
-          <option value="name-asc">Name (A-Z)</option>
-          <option value="name-desc">Name (Z-A)</option>
-          <option value="sku-asc">SKU (A-Z)</option>
-          <option value="sku-desc">SKU (Z-A)</option>
-        </select>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Sort by" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="created_at-desc">Newest First</SelectItem>
+            <SelectItem value="created_at-asc">Oldest First</SelectItem>
+            <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+            <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+            <SelectItem value="sku-asc">SKU (A-Z)</SelectItem>
+            <SelectItem value="sku-desc">SKU (Z-A)</SelectItem>
+          </SelectContent>
+        </SelectShadcn>
       </div>
 
       {loading ? (
@@ -119,6 +151,27 @@ export default function InventoryPage() {
       ) : (
         <Table columns={columns} data={items} />
       )}
+
+      <AlertDialog
+        open={deleteId !== null}
+        onOpenChange={() => setDeleteId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Item</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this item? This action cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="mt-6 flex gap-4">
         <Link href="/inventory/stock">

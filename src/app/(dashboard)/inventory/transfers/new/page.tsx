@@ -2,9 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
+import {
+  Select as SelectShadcn,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/SelectShadcn";
 import { ArrowLeft } from "lucide-react";
 import {
   transferInventory,
@@ -24,9 +31,11 @@ export default function NewTransferPage() {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState<{ value: string; label: string }[]>([]);
+  const [items, setItems] = useState<
+    { value: string; label: string; id: string }[]
+  >([]);
   const [warehouses, setWarehouses] = useState<
-    { value: string; label: string }[]
+    { value: string; label: string; id: string }[]
   >([]);
 
   useEffect(() => {
@@ -36,9 +45,11 @@ export default function NewTransferPage() {
         getWarehouses(),
       ]);
 
-      setItems(itemsData.map((i) => ({ value: i.id, label: i.name })));
+      setItems(
+        itemsData.map((i) => ({ value: i.id, label: i.name, id: i.id })),
+      );
       setWarehouses(
-        warehousesData.map((w) => ({ value: w.id, label: w.name })),
+        warehousesData.map((w) => ({ value: w.id, label: w.name, id: w.id })),
       );
     }
 
@@ -86,9 +97,10 @@ export default function NewTransferPage() {
         parseFloat(formData.quantity),
         formData.notes || undefined,
       );
+      toast.success("Transfer completed successfully");
       router.push("/inventory/transfers");
     } catch (error) {
-      alert(
+      toast.error(
         error instanceof Error ? error.message : "Failed to transfer inventory",
       );
     } finally {
@@ -109,41 +121,103 @@ export default function NewTransferPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
-        <Select
-          label="Item"
-          name="item_id"
-          options={[{ value: "", label: "Select an item" }, ...items]}
-          value={formData.item_id}
-          onChange={handleChange}
-          error={errors.item_id}
-          required
-        />
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-gray-700">Item</label>
+          <SelectShadcn
+            value={formData.item_id}
+            onValueChange={(value) =>
+              handleChange({ target: { name: "item_id", value } })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select an item" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Select an item</SelectItem>
+              {items.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  <div className="flex flex-col items-start">
+                    <span>{item.label}</span>
+                    <span className="text-xs text-gray-400">{item.id}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </SelectShadcn>
+          {errors.item_id && (
+            <span className="text-sm text-red-600">{errors.item_id}</span>
+          )}
+        </div>
 
-        <Select
-          label="Source Warehouse"
-          name="source_warehouse_id"
-          options={[
-            { value: "", label: "Select source warehouse" },
-            ...warehouses,
-          ]}
-          value={formData.source_warehouse_id}
-          onChange={handleChange}
-          error={errors.source_warehouse_id}
-          required
-        />
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-gray-700">
+            Source Warehouse
+          </label>
+          <SelectShadcn
+            value={formData.source_warehouse_id}
+            onValueChange={(value) =>
+              handleChange({ target: { name: "source_warehouse_id", value } })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select source warehouse" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Select source warehouse</SelectItem>
+              {warehouses.map((warehouse) => (
+                <SelectItem key={warehouse.value} value={warehouse.value}>
+                  <div className="flex flex-col">
+                    <span>{warehouse.label}</span>
+                    <span className="text-xs text-gray-400">
+                      {warehouse.id}
+                    </span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </SelectShadcn>
+          {errors.source_warehouse_id && (
+            <span className="text-sm text-red-600">
+              {errors.source_warehouse_id}
+            </span>
+          )}
+        </div>
 
-        <Select
-          label="Destination Warehouse"
-          name="destination_warehouse_id"
-          options={[
-            { value: "", label: "Select destination warehouse" },
-            ...warehouses,
-          ]}
-          value={formData.destination_warehouse_id}
-          onChange={handleChange}
-          error={errors.destination_warehouse_id}
-          required
-        />
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-gray-700">
+            Destination Warehouse
+          </label>
+          <SelectShadcn
+            value={formData.destination_warehouse_id}
+            onValueChange={(value) =>
+              handleChange({
+                target: { name: "destination_warehouse_id", value },
+              })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select destination warehouse" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Select destination warehouse</SelectItem>
+              {warehouses.map((warehouse) => (
+                <SelectItem key={warehouse.value} value={warehouse.value}>
+                  <div className="flex flex-col">
+                    <span>{warehouse.label}</span>
+                    <span className="text-xs text-gray-400">
+                      {warehouse.id}
+                    </span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </SelectShadcn>
+          {errors.destination_warehouse_id && (
+            <span className="text-sm text-red-600">
+              {errors.destination_warehouse_id}
+            </span>
+          )}
+        </div>
 
         <Input
           label="Quantity"

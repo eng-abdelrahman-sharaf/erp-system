@@ -2,7 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
-import { Select } from "@/components/ui/Select";
+import {
+  Select as SelectShadcn,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/SelectShadcn";
 import { Table } from "@/components/ui/Table";
 import { ArrowLeft, Package } from "lucide-react";
 import {
@@ -11,10 +17,17 @@ import {
   getWarehouses,
 } from "@/features/inventory/actions";
 import type { InventoryActivityLog } from "@/features/inventory/types";
+
+interface InventoryActivityLogWithNames extends InventoryActivityLog {
+  inventory_items?: { name: string; sku: string } | null;
+  warehouses?: { name: string } | null;
+  profiles?: { full_name: string } | null;
+  orders?: { order_number: string } | null;
+}
 import Link from "next/link";
 
 export default function ActivityLogsPage() {
-  const [logs, setLogs] = useState<InventoryActivityLog[]>([]);
+  const [logs, setLogs] = useState<InventoryActivityLogWithNames[]>([]);
   const [items, setItems] = useState<{ value: string; label: string }[]>([]);
   const [warehouses, setWarehouses] = useState<
     { value: string; label: string }[]
@@ -54,34 +67,46 @@ export default function ActivityLogsPage() {
   }, [filters]);
 
   const columns = [
-    { key: "item_id", header: "Item ID" },
-    { key: "warehouse_id", header: "Warehouse ID" },
+    {
+      key: "item",
+      header: "Item",
+      render: (row: InventoryActivityLogWithNames) =>
+        row.inventory_items?.name || row.item_id,
+    },
+    {
+      key: "warehouse",
+      header: "Warehouse",
+      render: (row: InventoryActivityLogWithNames) =>
+        row.warehouses?.name || row.warehouse_id,
+    },
     { key: "activity_type", header: "Activity Type" },
     {
       key: "quantity",
       header: "Quantity",
-      render: (row: InventoryActivityLog) => row.quantity?.toFixed(2) || "0",
+      render: (row: InventoryActivityLogWithNames) =>
+        row.quantity?.toFixed(2) || "0",
     },
     {
       key: "previous_total",
       header: "Prev Total",
-      render: (row: InventoryActivityLog) =>
+      render: (row: InventoryActivityLogWithNames) =>
         row.previous_total?.toFixed(2) || "0",
     },
     {
       key: "new_total",
       header: "New Total",
-      render: (row: InventoryActivityLog) => row.new_total?.toFixed(2) || "0",
+      render: (row: InventoryActivityLogWithNames) =>
+        row.new_total?.toFixed(2) || "0",
     },
     {
       key: "notes",
       header: "Notes",
-      render: (row: InventoryActivityLog) => row.notes || "-",
+      render: (row: InventoryActivityLogWithNames) => row.notes || "-",
     },
     {
       key: "created_at",
       header: "Date",
-      render: (row: InventoryActivityLog) =>
+      render: (row: InventoryActivityLogWithNames) =>
         new Date(row.created_at).toLocaleString(),
     },
   ];
@@ -101,39 +126,77 @@ export default function ActivityLogsPage() {
       </div>
 
       <div className="mb-4 flex gap-4">
-        <Select
-          label="Filter by Item"
-          options={[{ value: "", label: "All Items" }, ...items]}
-          value={filters.item_id}
-          onChange={(e) =>
-            setFilters((prev) => ({ ...prev, item_id: e.target.value }))
-          }
-        />
-        <Select
-          label="Filter by Warehouse"
-          options={[{ value: "", label: "All Warehouses" }, ...warehouses]}
-          value={filters.warehouse_id}
-          onChange={(e) =>
-            setFilters((prev) => ({ ...prev, warehouse_id: e.target.value }))
-          }
-        />
-        <Select
-          label="Filter by Activity Type"
-          options={[
-            { value: "", label: "All Types" },
-            { value: "addition", label: "Addition" },
-            { value: "manual_usage", label: "Manual Usage" },
-            { value: "reservation", label: "Reservation" },
-            { value: "release", label: "Release" },
-            { value: "consumption", label: "Consumption" },
-            { value: "transfer_out", label: "Transfer Out" },
-            { value: "transfer_in", label: "Transfer In" },
-          ]}
-          value={filters.activity_type}
-          onChange={(e) =>
-            setFilters((prev) => ({ ...prev, activity_type: e.target.value }))
-          }
-        />
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-gray-700">
+            Filter by Item
+          </label>
+          <SelectShadcn
+            value={filters.item_id}
+            onValueChange={(value) =>
+              setFilters((prev) => ({ ...prev, item_id: value }))
+            }
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="All Items" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Items</SelectItem>
+              {items.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </SelectShadcn>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-gray-700">
+            Filter by Warehouse
+          </label>
+          <SelectShadcn
+            value={filters.warehouse_id}
+            onValueChange={(value) =>
+              setFilters((prev) => ({ ...prev, warehouse_id: value }))
+            }
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="All Warehouses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Warehouses</SelectItem>
+              {warehouses.map((wh) => (
+                <SelectItem key={wh.value} value={wh.value}>
+                  {wh.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </SelectShadcn>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-gray-700">
+            Filter by Activity Type
+          </label>
+          <SelectShadcn
+            value={filters.activity_type}
+            onValueChange={(value) =>
+              setFilters((prev) => ({ ...prev, activity_type: value }))
+            }
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Types</SelectItem>
+              <SelectItem value="addition">Addition</SelectItem>
+              <SelectItem value="manual_usage">Manual Usage</SelectItem>
+              <SelectItem value="reservation">Reservation</SelectItem>
+              <SelectItem value="release">Release</SelectItem>
+              <SelectItem value="consumption">Consumption</SelectItem>
+              <SelectItem value="transfer_out">Transfer Out</SelectItem>
+              <SelectItem value="transfer_in">Transfer In</SelectItem>
+            </SelectContent>
+          </SelectShadcn>
+        </div>
       </div>
 
       {loading ? (

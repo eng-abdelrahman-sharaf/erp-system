@@ -1,38 +1,47 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { ArrowLeft } from 'lucide-react';
-import { createWarehouse } from '@/features/inventory/actions';
-import Link from 'next/link';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { ArrowLeft } from "lucide-react";
+import { createWarehouse } from "@/features/inventory/actions";
+import Link from "next/link";
+import { WarehouseCreateSchema } from "@/lib/validations";
 
 export default function NewWarehousePage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    name: '',
-    address: '',
-    description: '',
+    name: "",
+    address: "",
+    description: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
+  function handleChange(
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
+      setErrors((prev) => ({ ...prev, [name]: "" }));
     }
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const newErrors: Record<string, string> = {};
 
-    if (!formData.name.trim()) newErrors.name = 'Name is required';
-
-    if (Object.keys(newErrors).length > 0) {
+    // Validate using Zod schema
+    const validationResult = WarehouseCreateSchema.safeParse(formData);
+    if (!validationResult.success) {
+      const newErrors: Record<string, string> = {};
+      validationResult.error.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          newErrors[issue.path[0] as string] = issue.message;
+        }
+      });
       setErrors(newErrors);
       return;
     }
@@ -40,9 +49,12 @@ export default function NewWarehousePage() {
     setLoading(true);
     try {
       await createWarehouse(formData);
-      router.push('/warehouses');
+      toast.success("Warehouse created successfully");
+      router.push("/warehouses");
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Failed to create warehouse');
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create warehouse",
+      );
     } finally {
       setLoading(false);
     }
@@ -78,7 +90,9 @@ export default function NewWarehousePage() {
         />
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-gray-700">Description</label>
+          <label className="text-sm font-medium text-gray-700">
+            Description
+          </label>
           <textarea
             name="description"
             value={formData.description}
@@ -90,7 +104,7 @@ export default function NewWarehousePage() {
 
         <div className="flex gap-4">
           <Button type="submit" disabled={loading}>
-            {loading ? 'Creating...' : 'Create Warehouse'}
+            {loading ? "Creating..." : "Create Warehouse"}
           </Button>
           <Link href="/warehouses">
             <Button type="button" variant="secondary">

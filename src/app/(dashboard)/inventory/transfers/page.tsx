@@ -6,10 +6,17 @@ import { Table } from "@/components/ui/Table";
 import { ArrowLeft, Package } from "lucide-react";
 import { getWarehouseTransfers } from "@/features/inventory/actions";
 import type { WarehouseTransfer } from "@/features/inventory/types";
+
+interface WarehouseTransferWithNames extends WarehouseTransfer {
+  inventory_items?: { name: string; sku: string } | null;
+  source_warehouse?: { name: string } | null;
+  destination_warehouse?: { name: string } | null;
+  profiles?: { full_name: string } | null;
+}
 import Link from "next/link";
 
 export default function TransfersPage() {
-  const [transfers, setTransfers] = useState<WarehouseTransfer[]>([]);
+  const [transfers, setTransfers] = useState<WarehouseTransferWithNames[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,24 +31,40 @@ export default function TransfersPage() {
   }, []);
 
   const columns = [
-    { key: "item_id", header: "Item ID" },
-    { key: "source_warehouse_id", header: "Source Warehouse ID" },
-    { key: "destination_warehouse_id", header: "Destination Warehouse ID" },
+    {
+      key: "item",
+      header: "Item",
+      render: (row: WarehouseTransferWithNames) =>
+        row.inventory_items?.name || row.item_id,
+    },
+    {
+      key: "source_warehouse",
+      header: "Source Warehouse",
+      render: (row: WarehouseTransferWithNames) =>
+        row.source_warehouse?.name || row.source_warehouse_id,
+    },
+    {
+      key: "destination_warehouse",
+      header: "Destination Warehouse",
+      render: (row: WarehouseTransferWithNames) =>
+        row.destination_warehouse?.name || row.destination_warehouse_id,
+    },
     {
       key: "quantity",
       header: "Quantity",
-      render: (row: WarehouseTransfer) => row.quantity?.toFixed(2) || "0",
+      render: (row: WarehouseTransferWithNames) =>
+        row.quantity?.toFixed(2) || "0",
     },
     {
       key: "transfer_date",
       header: "Date",
-      render: (row: WarehouseTransfer) =>
+      render: (row: WarehouseTransferWithNames) =>
         new Date(row.transfer_date).toLocaleDateString(),
     },
     {
       key: "notes",
       header: "Notes",
-      render: (row: WarehouseTransfer) => row.notes || "-",
+      render: (row: WarehouseTransferWithNames) => row.notes || "-",
     },
   ];
 

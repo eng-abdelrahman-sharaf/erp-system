@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Table } from "@/components/ui/Table";
@@ -15,7 +15,7 @@ import type {
 } from "@/features/inventory/types";
 import Link from "next/link";
 
-export default function InventoryItemDetailsPage() {
+function InventoryItemDetailsContent() {
   const params = useParams();
   const itemId = params.id as string;
 
@@ -32,7 +32,9 @@ export default function InventoryItemDetailsPage() {
         ]);
         setItem(itemData);
         setStock(
-          stockData.filter((s) => s.total_quantity && s.total_quantity > 0),
+          stockData.filter(
+            (s: InventorySummary) => s.total_quantity && s.total_quantity > 0,
+          ),
         );
       } catch (error) {
         console.error("Error loading data:", error);
@@ -143,5 +145,13 @@ export default function InventoryItemDetailsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function InventoryItemDetailsPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <InventoryItemDetailsContent />
+    </Suspense>
   );
 }

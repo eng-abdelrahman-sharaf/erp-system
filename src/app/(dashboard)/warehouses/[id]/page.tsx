@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Table } from "@/components/ui/Table";
@@ -9,7 +9,7 @@ import { getWarehouse, getWarehouseStock } from "@/features/inventory/actions";
 import type { Warehouse, InventorySummary } from "@/features/inventory/types";
 import Link from "next/link";
 
-export default function WarehouseDetailsPage() {
+function WarehouseDetailsContent() {
   const params = useParams();
   const warehouseId = params.id as string;
 
@@ -137,5 +137,13 @@ export default function WarehouseDetailsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function WarehouseDetailsPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <WarehouseDetailsContent />
+    </Suspense>
   );
 }

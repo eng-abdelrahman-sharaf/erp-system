@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { ArrowLeft } from "lucide-react";
@@ -11,7 +12,7 @@ import {
 } from "@/features/inventory/actions";
 import Link from "next/link";
 
-export default function EditInventoryItemPage() {
+function EditInventoryItemContent() {
   const router = useRouter();
   const params = useParams();
   const itemId = params.id as string;
@@ -38,11 +39,11 @@ export default function EditInventoryItemPage() {
             unit: item.unit,
           });
         } else {
-          alert("Item not found");
+          toast.error("Item not found");
           router.push("/inventory");
         }
       } catch {
-        alert("Failed to load item");
+        toast.error("Failed to load item");
         router.push("/inventory");
       } finally {
         setLoading(false);
@@ -78,9 +79,12 @@ export default function EditInventoryItemPage() {
     setSaving(true);
     try {
       await updateInventoryItem(itemId, formData);
+      toast.success("Item updated successfully");
       router.push(`/inventory/items/${itemId}`);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to update item");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update item",
+      );
     } finally {
       setSaving(false);
     }
@@ -158,5 +162,13 @@ export default function EditInventoryItemPage() {
         </div>
       </form>
     </div>
+  );
+}
+
+export default function EditInventoryItemPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <EditInventoryItemContent />
+    </Suspense>
   );
 }

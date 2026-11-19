@@ -1,9 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Table } from "@/components/ui/Table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/AlertDialog";
 import { Plus, Search, Warehouse as WarehouseIcon } from "lucide-react";
 import { getWarehouses, deleteWarehouse } from "@/features/inventory/actions";
 import type { Warehouse } from "@/features/inventory/types";
@@ -13,6 +24,7 @@ export default function WarehousesPage() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   async function loadWarehouses() {
     setLoading(true);
@@ -27,14 +39,21 @@ export default function WarehousesPage() {
   }, [search]);
 
   async function handleDelete(id: string) {
-    if (!confirm("Are you sure you want to delete this warehouse?")) return;
+    setDeleteId(id);
+  }
+
+  async function confirmDelete() {
+    if (!deleteId) return;
     try {
-      await deleteWarehouse(id);
+      await deleteWarehouse(deleteId);
       loadWarehouses();
+      toast.success("Warehouse deleted successfully");
+      setDeleteId(null);
     } catch (error) {
-      alert(
+      toast.error(
         error instanceof Error ? error.message : "Failed to delete warehouse",
       );
+      setDeleteId(null);
     }
   }
 
@@ -108,6 +127,26 @@ export default function WarehousesPage() {
       ) : (
         <Table columns={columns} data={warehouses} />
       )}
+
+      <AlertDialog
+        open={deleteId !== null}
+        onOpenChange={() => setDeleteId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Warehouse</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this warehouse?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

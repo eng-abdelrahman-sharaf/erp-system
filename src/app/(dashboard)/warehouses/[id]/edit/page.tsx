@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { ArrowLeft } from "lucide-react";
 import { getWarehouse, updateWarehouse } from "@/features/inventory/actions";
-import type { Warehouse } from "@/features/inventory/types";
 import Link from "next/link";
 
-export default function EditWarehousePage() {
+function EditWarehouseContent() {
   const router = useRouter();
   const params = useParams();
   const warehouseId = params.id as string;
@@ -34,11 +34,11 @@ export default function EditWarehousePage() {
             description: warehouse.description || "",
           });
         } else {
-          alert("Warehouse not found");
+          toast.error("Warehouse not found");
           router.push("/warehouses");
         }
       } catch {
-        alert("Failed to load warehouse");
+        toast.error("Failed to load warehouse");
         router.push("/warehouses");
       } finally {
         setLoading(false);
@@ -72,9 +72,10 @@ export default function EditWarehousePage() {
     setSaving(true);
     try {
       await updateWarehouse(warehouseId, formData);
+      toast.success("Warehouse updated successfully");
       router.push(`/warehouses/${warehouseId}`);
     } catch (error) {
-      alert(
+      toast.error(
         error instanceof Error ? error.message : "Failed to update warehouse",
       );
     } finally {
@@ -140,5 +141,13 @@ export default function EditWarehousePage() {
         </div>
       </form>
     </div>
+  );
+}
+
+export default function EditWarehousePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <EditWarehouseContent />
+    </Suspense>
   );
 }
