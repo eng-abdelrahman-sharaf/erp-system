@@ -1,11 +1,37 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Table } from "@/components/ui/Table";
 import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
+import {
+  Select as SelectShadcn,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/SelectShadcn";
+import { Checkbox } from "@/components/ui/Checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/Dialog";
+import { Label } from "@/components/ui/Label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/AlertDialog";
 import { Plus, Edit, Trash2, Shield } from "lucide-react";
 import {
   getUsers,
@@ -22,6 +48,7 @@ import {
   updateRolePermissions,
 } from "@/app/actions/roles";
 import { ModuleName } from "@/lib/permissions/permissions";
+import { RoleSchema, ProfileCreateSchema } from "@/lib/validations";
 
 interface User {
   id: string;
@@ -52,7 +79,9 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+  const [deleteRoleId, setDeleteRoleId] = useState<string | null>(null);
 
   // User modal state
   const [showUserModal, setShowUserModal] = useState(false);
@@ -82,21 +111,23 @@ export default function UsersPage() {
 
   const loadData = async () => {
     setLoading(true);
-    setError("");
+    setErrors({});
 
+    // Always load roles since they're needed for the user creation dropdown
+    const rolesResult = await getRoles();
+    if (rolesResult.success && rolesResult.data) {
+      setRoles(rolesResult.data as Role[]);
+    } else {
+      setErrors({ general: rolesResult.error || "Failed to load roles" });
+    }
+
+    // Load users only when on the users tab
     if (activeTab === "users") {
       const result = await getUsers();
       if (result.success && result.data) {
         setUsers(result.data as User[]);
       } else {
-        setError(result.error || "Failed to load users");
-      }
-    } else {
-      const result = await getRoles();
-      if (result.success && result.data) {
-        setRoles(result.data as Role[]);
-      } else {
-        setError(result.error || "Failed to load roles");
+        setErrors({ general: result.error || "Failed to load users" });
       }
     }
 
@@ -104,11 +135,29 @@ export default function UsersPage() {
   };
 
   useEffect(() => {
-    const initialDataLoad = async()=>loadData()
+    const initialDataLoad = async () => loadData();
     initialDataLoad();
   }, [activeTab]);
 
   const handleCreateUser = async () => {
+    // Validate using Zod schema
+    const validationResult = ProfileCreateSchema.safeParse({
+      email: userForm.email,
+      full_name: userForm.full_name,
+      role_id: userForm.role_id,
+      status: "active",
+    });
+    if (!validationResult.success) {
+      const newErrors: Record<string, string> = {};
+      validationResult.error.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          newErrors[issue.path[0] as string] = issue.message;
+        }
+      });
+      setErrors(newErrors);
+      return;
+    }
+
     const result = await createUser({
       email: userForm.email,
       password: userForm.password,
@@ -119,9 +168,11 @@ export default function UsersPage() {
     if (result.success) {
       setShowUserModal(false);
       resetUserForm();
+      setErrors({});
       loadData();
+      toast.success("User created successfully");
     } else {
-      setError(result.error || "Failed to create user");
+      toast.error(result.error || "Failed to create user");
     }
   };
 
@@ -138,9 +189,11 @@ export default function UsersPage() {
       setShowUserModal(false);
       setEditingUser(null);
       resetUserForm();
+      setErrors({});
       loadData();
+      toast.success("User updated successfully");
     } else {
-      setError(result.error || "Failed to update user");
+      toast.error(result.error || "Failed to update user");
     }
   };
 
@@ -152,29 +205,43 @@ export default function UsersPage() {
     const result = await setUserStatus(userId, newStatus);
     if (result.success) {
       loadData();
+      toast.success("User status updated");
     } else {
-      setError(result.error || "Failed to update user status");
+      toast.error(result.error || "Failed to update user status");
     }
   };
 
   const handleDeleteUser = async (userId: string) => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this user? This action cannot be undone.",
-      )
-    ) {
-      return;
-    }
+    setDeleteUserId(userId);
+  };
 
-    const result = await deleteUser(userId);
+  const confirmDeleteUser = async () => {
+    if (!deleteUserId) return;
+    const result = await deleteUser(deleteUserId);
     if (result.success) {
       loadData();
+      toast.success("User deleted successfully");
+      setDeleteUserId(null);
     } else {
-      setError(result.error || "Failed to delete user");
+      toast.error(result.error || "Failed to delete user");
+      setDeleteUserId(null);
     }
   };
 
   const handleCreateRole = async () => {
+    // Validate using Zod schema
+    const validationResult = RoleSchema.safeParse(roleForm);
+    if (!validationResult.success) {
+      const newErrors: Record<string, string> = {};
+      validationResult.error.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          newErrors[issue.path[0] as string] = issue.message;
+        }
+      });
+      setErrors(newErrors);
+      return;
+    }
+
     const result = await createRole({
       name: roleForm.name,
       description: roleForm.description || undefined,
@@ -183,14 +250,33 @@ export default function UsersPage() {
     if (result.success) {
       setShowRoleModal(false);
       resetRoleForm();
+      setErrors({});
       loadData();
+      toast.success("Role created successfully");
     } else {
-      setError(result.error || "Failed to create role");
+      toast.error(result.error || "Failed to create role");
     }
   };
 
   const handleUpdateRole = async () => {
     if (!editingRole) return;
+
+    // Validate using Zod schema
+    const validationResult = RoleSchema.safeParse({
+      id: editingRole.id,
+      name: roleForm.name,
+      description: roleForm.description || undefined,
+    });
+    if (!validationResult.success) {
+      const newErrors: Record<string, string> = {};
+      validationResult.error.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          newErrors[issue.path[0] as string] = issue.message;
+        }
+      });
+      setErrors(newErrors);
+      return;
+    }
 
     const result = await updateRole({
       id: editingRole.id,
@@ -217,29 +303,31 @@ export default function UsersPage() {
         setShowRoleModal(false);
         setEditingRole(null);
         resetRoleForm();
+        setErrors({});
         loadData();
+        toast.success("Role updated successfully");
       } else {
-        setError(permResult.error || "Failed to update permissions");
+        toast.error(permResult.error || "Failed to update permissions");
       }
     } else {
-      setError(result.error || "Failed to update role");
+      toast.error(result.error || "Failed to update role");
     }
   };
 
   const handleDeleteRole = async (roleId: string) => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this role? This action cannot be undone.",
-      )
-    ) {
-      return;
-    }
+    setDeleteRoleId(roleId);
+  };
 
-    const result = await deleteRole(roleId);
+  const confirmDeleteRole = async () => {
+    if (!deleteRoleId) return;
+    const result = await deleteRole(deleteRoleId);
     if (result.success) {
       loadData();
+      toast.success("Role deleted successfully");
+      setDeleteRoleId(null);
     } else {
-      setError(result.error || "Failed to delete role");
+      toast.error(result.error || "Failed to delete role");
+      setDeleteRoleId(null);
     }
   };
 
@@ -325,9 +413,9 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {error && (
+      {errors.general && (
         <div className="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
-          {error}
+          {errors.general}
         </div>
       )}
 
@@ -351,71 +439,71 @@ export default function UsersPage() {
           <CardContent>
             {loading ? (
               <p className="text-gray-600">Loading...</p>
-            ) : users.length === 0 ? (
-              <p className="text-gray-600">No users found</p>
             ) : (
-              <Table>
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Status</th>
-                    <th>Created</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((user) => (
-                    <tr key={user.id}>
-                      <td>{user.full_name}</td>
-                      <td>{user.email}</td>
-                      <td>{user.roles.name}</td>
-                      <td>
-                        <span
-                          className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                            user.status === "active"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
+              <Table
+                columns={[
+                  { key: "full_name", header: "Name" },
+                  { key: "email", header: "Email" },
+                  {
+                    key: "role",
+                    header: "Role",
+                    render: (row: User) => row.roles.name,
+                  },
+                  {
+                    key: "status",
+                    header: "Status",
+                    render: (row: User) => (
+                      <span
+                        className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                          row.status === "active"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {row.status}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: "created_at",
+                    header: "Created",
+                    render: (row: User) =>
+                      new Date(row.created_at).toLocaleDateString(),
+                  },
+                  {
+                    key: "actions",
+                    header: "Actions",
+                    render: (row: User) => (
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEditUser(row)}
                         >
-                          {user.status}
-                        </span>
-                      </td>
-                      <td>{new Date(user.created_at).toLocaleDateString()}</td>
-                      <td>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditUser(user)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              handleToggleUserStatus(user.id, user.status)
-                            }
-                          >
-                            {user.status === "active"
-                              ? "Deactivate"
-                              : "Activate"}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteUser(user.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            handleToggleUserStatus(row.id, row.status)
+                          }
+                        >
+                          <Shield className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteUser(row.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ),
+                  },
+                ]}
+                data={users}
+              />
             )}
           </CardContent>
         </Card>
@@ -439,243 +527,289 @@ export default function UsersPage() {
           <CardContent>
             {loading ? (
               <p className="text-gray-600">Loading...</p>
-            ) : roles.length === 0 ? (
-              <p className="text-gray-600">No roles found</p>
             ) : (
-              <Table>
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Description</th>
-                    <th>Permissions</th>
-                    <th>Created</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {roles.map((role) => (
-                    <tr key={role.id}>
-                      <td>{role.name}</td>
-                      <td>{role.description || "-"}</td>
-                      <td>
-                        <div className="flex flex-wrap gap-1">
-                          {role.role_permissions.map((p) => (
-                            <span
-                              key={p.module}
-                              className="inline-flex rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800"
-                            >
-                              {p.module} ({p.can_read ? "R" : ""}
-                              {p.can_write ? "W" : ""})
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td>{new Date(role.created_at).toLocaleDateString()}</td>
-                      <td>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditRole(role)}
+              <Table
+                columns={[
+                  { key: "name", header: "Name" },
+                  {
+                    key: "description",
+                    header: "Description",
+                    render: (row: Role) => row.description || "-",
+                  },
+                  {
+                    key: "permissions",
+                    header: "Permissions",
+                    render: (row: Role) => (
+                      <div className="flex flex-wrap gap-1">
+                        {row.role_permissions.map((p) => (
+                          <span
+                            key={p.module}
+                            className="inline-flex rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800"
                           >
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                            {p.module} ({p.can_read ? "R" : ""}
+                            {p.can_write ? "W" : ""})
+                          </span>
+                        ))}
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "created_at",
+                    header: "Created",
+                    render: (row: Role) =>
+                      new Date(row.created_at).toLocaleDateString(),
+                  },
+                  {
+                    key: "actions",
+                    header: "Actions",
+                    render: (row: Role) => (
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEditRole(row)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        {row.name !== "Admin" && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDeleteRole(role.id)}
+                            onClick={() => handleDeleteRole(row.id)}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
+                        )}
+                      </div>
+                    ),
+                  },
+                ]}
+                data={roles}
+              />
             )}
           </CardContent>
         </Card>
       )}
 
       {/* User Modal */}
-      {showUserModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle>{editingUser ? "Edit User" : "Create User"}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <Input
-                  label="Full Name"
-                  value={userForm.full_name}
-                  onChange={(e) =>
-                    setUserForm({ ...userForm, full_name: e.target.value })
-                  }
-                  required
-                />
-                <Input
-                  label="Email"
-                  type="email"
-                  value={userForm.email}
-                  onChange={(e) =>
-                    setUserForm({ ...userForm, email: e.target.value })
-                  }
-                  required
-                  disabled={!!editingUser}
-                />
-                {!editingUser && (
-                  <Input
-                    label="Password"
-                    type="password"
-                    value={userForm.password}
-                    onChange={(e) =>
-                      setUserForm({ ...userForm, password: e.target.value })
-                    }
-                    required
-                  />
-                )}
-                <Select
-                  label="Role"
-                  value={userForm.role_id}
-                  onChange={(e) =>
-                    setUserForm({ ...userForm, role_id: e.target.value })
-                  }
-                  required
-                >
-                  <option value="">Select a role</option>
+      <Dialog open={showUserModal} onOpenChange={setShowUserModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {editingUser ? "Edit User" : "Create User"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              label="Full Name"
+              value={userForm.full_name}
+              onChange={(e) =>
+                setUserForm({ ...userForm, full_name: e.target.value })
+              }
+              error={errors.full_name}
+              required
+            />
+            <Input
+              label="Email"
+              type="email"
+              value={userForm.email}
+              onChange={(e) =>
+                setUserForm({ ...userForm, email: e.target.value })
+              }
+              error={errors.email}
+              required
+              disabled={!!editingUser}
+            />
+            {!editingUser && (
+              <Input
+                label="Password"
+                type="password"
+                value={userForm.password}
+                onChange={(e) =>
+                  setUserForm({ ...userForm, password: e.target.value })
+                }
+                required
+              />
+            )}
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="role">Role</Label>
+              <SelectShadcn
+                value={userForm.role_id}
+                onValueChange={(value) =>
+                  setUserForm({ ...userForm, role_id: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a role" />
+                </SelectTrigger>
+                <SelectContent>
                   {roles.map((role) => (
-                    <option key={role.id} value={role.id}>
-                      {role.name}
-                    </option>
+                    <SelectItem key={role.id} value={role.id}>
+                      <div className="flex flex-col items-start">
+                        <span>{role.name}</span>
+                        <span className="text-xs text-gray-400">{role.id}</span>
+                      </div>
+                    </SelectItem>
                   ))}
-                </Select>
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      setShowUserModal(false);
-                      resetUserForm();
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={editingUser ? handleUpdateUser : handleCreateUser}
-                  >
-                    {editingUser ? "Update" : "Create"}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+                </SelectContent>
+              </SelectShadcn>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowUserModal(false);
+                resetUserForm();
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={editingUser ? handleUpdateUser : handleCreateUser}>
+              {editingUser ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Role Modal */}
-      {showRoleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <Card className="w-full max-w-lg">
-            <CardHeader>
-              <CardTitle>{editingRole ? "Edit Role" : "Create Role"}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <Input
-                  label="Role Name"
-                  value={roleForm.name}
-                  onChange={(e) =>
-                    setRoleForm({ ...roleForm, name: e.target.value })
-                  }
-                  required
-                />
-                <Input
-                  label="Description"
-                  value={roleForm.description}
-                  onChange={(e) =>
-                    setRoleForm({ ...roleForm, description: e.target.value })
-                  }
-                />
+      <Dialog open={showRoleModal} onOpenChange={setShowRoleModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {editingRole ? "Edit Role" : "Create Role"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              label="Role Name"
+              value={roleForm.name}
+              onChange={(e) =>
+                setRoleForm({ ...roleForm, name: e.target.value })
+              }
+              error={errors.name}
+              required
+              disabled={editingRole?.name === "Admin"}
+            />
+            <Input
+              label="Description"
+              value={roleForm.description}
+              onChange={(e) =>
+                setRoleForm({ ...roleForm, description: e.target.value })
+              }
+            />
 
-                {editingRole && (
-                  <div className="space-y-3">
-                    <h3 className="font-semibold text-gray-900">Permissions</h3>
-                    {(
-                      [
-                        "users",
-                        "orders",
-                        "employees",
-                        "inventory",
-                      ] as ModuleName[]
-                    ).map((module) => (
-                      <div
-                        key={module}
-                        className="flex items-center gap-4 rounded-md border p-3"
-                      >
-                        <Shield className="h-5 w-5 text-gray-600" />
-                        <span className="flex-1 font-medium capitalize">
-                          {module}
-                        </span>
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={permissions[module].can_read}
-                            onChange={(e) =>
-                              setPermissions({
-                                ...permissions,
-                                [module]: {
-                                  ...permissions[module],
-                                  can_read: e.target.checked,
-                                },
-                              })
-                            }
-                          />
-                          <span className="text-sm">Read</span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={permissions[module].can_write}
-                            onChange={(e) =>
-                              setPermissions({
-                                ...permissions,
-                                [module]: {
-                                  ...permissions[module],
-                                  can_write: e.target.checked,
-                                },
-                              })
-                            }
-                            disabled={!permissions[module].can_read}
-                          />
-                          <span className="text-sm">Write</span>
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      setShowRoleModal(false);
-                      resetRoleForm();
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={editingRole ? handleUpdateRole : handleCreateRole}
-                  >
-                    {editingRole ? "Update" : "Create"}
-                  </Button>
+            <div className="space-y-3">
+              <h3 className="font-semibold text-gray-900">Permissions</h3>
+              {(
+                ["users", "orders", "employees", "inventory"] as ModuleName[]
+              ).map((module) => (
+                <div
+                  key={module}
+                  className="flex items-center gap-4 rounded-md border p-3"
+                >
+                  <Shield className="h-5 w-5 text-gray-600" />
+                  <span className="flex-1 font-medium capitalize">
+                    {module}
+                  </span>
+                  <label className="flex items-center gap-2">
+                    <Checkbox
+                      checked={permissions[module].can_read}
+                      onCheckedChange={(checked) =>
+                        setPermissions({
+                          ...permissions,
+                          [module]: {
+                            ...permissions[module],
+                            can_read: checked === true,
+                          },
+                        })
+                      }
+                      disabled={editingRole?.name === "Admin"}
+                    />
+                    <span className="text-sm">Read</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <Checkbox
+                      checked={permissions[module].can_write}
+                      onCheckedChange={(checked) =>
+                        setPermissions({
+                          ...permissions,
+                          [module]: {
+                            ...permissions[module],
+                            can_write: checked === true,
+                          },
+                        })
+                      }
+                      disabled={
+                        !permissions[module].can_read ||
+                        editingRole?.name === "Admin" ||
+                        (module === "users" && editingRole?.name !== "Admin")
+                      }
+                    />
+                    <span className="text-sm">Write</span>
+                  </label>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowRoleModal(false);
+                resetRoleForm();
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={editingRole ? handleUpdateRole : handleCreateRole}>
+              {editingRole ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={deleteUserId !== null}
+        onOpenChange={() => setDeleteUserId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this user? This action cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteUser}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={deleteRoleId !== null}
+        onOpenChange={() => setDeleteRoleId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Role</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this role? This action cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteRole}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

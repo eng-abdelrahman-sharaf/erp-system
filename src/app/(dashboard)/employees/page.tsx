@@ -2,10 +2,28 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
+import { DatePicker } from "@/components/ui/DatePicker";
+import {
+  Select as SelectShadcn,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/SelectShadcn";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/AlertDialog";
 import { Plus, Edit, Trash2, User } from "lucide-react";
 import {
   getEmployees,
@@ -31,6 +49,7 @@ export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -48,7 +67,7 @@ export default function EmployeesPage() {
     address: "",
     position: "",
     salary: "",
-    employment_date: "",
+    employment_date: undefined as Date | undefined,
     status: "active" as "active" | "inactive",
     notes: "",
   });
@@ -87,7 +106,9 @@ export default function EmployeesPage() {
       address: form.address || undefined,
       position: form.position || undefined,
       salary: parseFloat(form.salary),
-      employment_date: form.employment_date,
+      employment_date: form.employment_date
+        ? form.employment_date.toISOString().split("T")[0]
+        : "",
       status: form.status,
       notes: form.notes || undefined,
     });
@@ -112,7 +133,9 @@ export default function EmployeesPage() {
       address: form.address || undefined,
       position: form.position || undefined,
       salary: parseFloat(form.salary),
-      employment_date: form.employment_date,
+      employment_date: form.employment_date
+        ? form.employment_date.toISOString().split("T")[0]
+        : "",
       status: form.status,
       notes: form.notes || undefined,
     });
@@ -128,19 +151,19 @@ export default function EmployeesPage() {
   };
 
   const handleDelete = async (employeeId: string) => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this employee? This action cannot be undone.",
-      )
-    ) {
-      return;
-    }
+    setDeleteId(employeeId);
+  };
 
-    const result = await deleteEmployee(employeeId);
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    const result = await deleteEmployee(deleteId);
     if (result.success) {
       loadData();
+      toast.success("Employee deleted successfully");
+      setDeleteId(null);
     } else {
       setError(result.error || "Failed to delete employee");
+      setDeleteId(null);
     }
   };
 
@@ -153,7 +176,7 @@ export default function EmployeesPage() {
       address: "",
       position: employee.position || "",
       salary: employee.salary.toString(),
-      employment_date: employee.employment_date,
+      employment_date: new Date(employee.employment_date),
       status: employee.status,
       notes: "",
     });
@@ -168,7 +191,7 @@ export default function EmployeesPage() {
       address: "",
       position: "",
       salary: "",
-      employment_date: "",
+      employment_date: undefined,
       status: "active",
       notes: "",
     });
@@ -207,19 +230,21 @@ export default function EmployeesPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-64"
               />
-              <Select
+              <SelectShadcn
                 value={statusFilter}
-                onChange={(e) =>
-                  setStatusFilter(
-                    e.target.value as "all" | "active" | "inactive",
-                  )
+                onValueChange={(value) =>
+                  setStatusFilter(value as "all" | "active" | "inactive")
                 }
-                options={[
-                  { value: "all", label: "All Status" },
-                  { value: "active", label: "Active" },
-                  { value: "inactive", label: "Inactive" },
-                ]}
-              />
+              >
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </SelectShadcn>
             </div>
           </div>
         </CardHeader>
@@ -383,29 +408,40 @@ export default function EmployeesPage() {
                   onChange={(e) => setForm({ ...form, salary: e.target.value })}
                   required
                 />
-                <Input
-                  label="Employment Date"
-                  type="date"
-                  value={form.employment_date}
-                  onChange={(e) =>
-                    setForm({ ...form, employment_date: e.target.value })
-                  }
-                  required
-                />
-                <Select
-                  label="Status"
-                  value={form.status}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      status: e.target.value as "active" | "inactive",
-                    })
-                  }
-                  options={[
-                    { value: "active", label: "Active" },
-                    { value: "inactive", label: "Inactive" },
-                  ]}
-                />
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-gray-700">
+                    Employment Date <span className="text-red-500">*</span>
+                  </label>
+                  <DatePicker
+                    value={form.employment_date}
+                    onChange={(date) =>
+                      setForm({ ...form, employment_date: date })
+                    }
+                    placeholder="Select employment date"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-gray-700">
+                    Status
+                  </label>
+                  <SelectShadcn
+                    value={form.status}
+                    onValueChange={(value) =>
+                      setForm({
+                        ...form,
+                        status: value as "active" | "inactive",
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </SelectShadcn>
+                </div>
                 <Input
                   label="Notes"
                   value={form.notes}
@@ -432,6 +468,27 @@ export default function EmployeesPage() {
           </Card>
         </div>
       )}
+
+      <AlertDialog
+        open={deleteId !== null}
+        onOpenChange={() => setDeleteId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Employee</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this employee? This action cannot
+              be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

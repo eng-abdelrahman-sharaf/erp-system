@@ -1,8 +1,10 @@
 "use server";
 
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { hasPermission } from "@/lib/permissions/permissions";
+import { ProfileUpdateSchema } from "@/lib/validations";
 
 // Initialize Supabase Admin client with service-role key
 // This should only be used in server actions, never exposed to the client
@@ -20,12 +22,7 @@ export interface CreateUserInput {
   role_id: string;
 }
 
-export interface UpdateUserInput {
-  id: string;
-  full_name?: string;
-  role_id?: string;
-  status?: "active" | "inactive";
-}
+export type UpdateUserInput = z.infer<typeof ProfileUpdateSchema>;
 
 /**
  * Create a new user with authentication account and profile
@@ -88,17 +85,30 @@ export async function updateUser(input: UpdateUserInput) {
     return { error: "Insufficient permissions to update users" };
   }
 
+  // Validate input using Zod schema
+  const validationResult = ProfileUpdateSchema.safeParse(input);
+  if (!validationResult.success) {
+    return {
+      error: validationResult.error.issues[0].message,
+    };
+  }
+
   try {
     const supabase = await createClient();
-    // @ts-ignore - Database types not generated yet
     const { error } = await supabase
       .from("profiles")
       .update({
-        ...(input.full_name && { full_name: input.full_name }),
-        ...(input.role_id && { role_id: input.role_id }),
-        ...(input.status && { status: input.status }),
+        ...(validationResult.data.full_name && {
+          full_name: validationResult.data.full_name,
+        }),
+        ...(validationResult.data.role_id && {
+          role_id: validationResult.data.role_id,
+        }),
+        ...(validationResult.data.status && {
+          status: validationResult.data.status,
+        }),
       })
-      .eq("id", input.id);
+      .eq("id", validationResult.data.id);
 
     if (error) {
       return { error: error.message };
