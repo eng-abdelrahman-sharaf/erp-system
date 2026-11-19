@@ -9,7 +9,7 @@ export async function updateSession(request: NextRequest) {
 
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_PUBLISHABLE_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       cookies: {
         getAll() {
@@ -48,7 +48,6 @@ export async function updateSession(request: NextRequest) {
       .eq("id", user.id)
       .single();
 
-    // @ts-expect-error - Database types not generated yet
     if (profile && profile.status === "inactive") {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
