@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -22,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/AlertDialog";
-import { Plus, Edit, Trash2, ShoppingCart } from "lucide-react";
+import { Plus, Edit, Trash2, ShoppingCart, Loader2 } from "lucide-react";
 import { getOrders, deleteOrder } from "@/features/orders/actions";
 import type { OrderWithEmployee } from "@/features/orders/types";
 
@@ -30,7 +31,12 @@ export default function OrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<OrderWithEmployee[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  // error state removed; toast handling only
+  const [isAddingOrder, setIsAddingOrder] = useState(false);
+  const [navigatingOrderId, setNavigatingOrderId] = useState<string | null>(null);
+  const [navigatingEditId, setNavigatingEditId] = useState<string | null>(null);
+
+  const setError = (msg: string) => { if (msg) toast.error(msg); };
 
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -41,9 +47,9 @@ export default function OrdersPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
 
-  const loadData = async () => {
-    setLoading(true);
-    setError("");
+  const loadData = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
+
 
     const filters: {
       search?: string;
@@ -54,16 +60,19 @@ export default function OrdersPage() {
     if (statusFilter !== "all") filters.status = statusFilter;
     filters.sortBy = sortBy;
 
-    const data = await getOrders(filters);
-    setOrders(data);
-    setLoading(false);
+    try {
+      const data = await getOrders(filters);
+      setOrders(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load orders");
+    } finally {
+      if (showLoading) setLoading(false);
+    }
   };
 
   useEffect(() => {
-    const fetchData = async () => {
-      await loadData();
-    };
-    fetchData();
+    loadData(true);
+    setNavigatingOrderId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, statusFilter, sortBy]);
 
@@ -74,16 +83,22 @@ export default function OrdersPage() {
 
   const confirmDelete = async () => {
     if (!orderToDelete) return;
+    const id = orderToDelete;
+    const previousOrders = orders;
+
+    // Immediate optimistic deletion
+    setDeleteDialogOpen(false);
+    setOrderToDelete(null);
+    setOrders((prev) => prev.filter((o) => o.id !== id));
 
     try {
-      await deleteOrder(orderToDelete);
-      setDeleteDialogOpen(false);
-      setOrderToDelete(null);
-      loadData();
+      await deleteOrder(id);
+      toast.success("Order deleted successfully");
+      loadData(false);
     } catch (err) {
+      // Revert on error
+      setOrders(previousOrders);
       setError(err instanceof Error ? err.message : "Failed to delete order");
-      setDeleteDialogOpen(false);
-      setOrderToDelete(null);
     }
   };
 
@@ -115,17 +130,23 @@ export default function OrdersPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Orders</h1>
-        <Button onClick={() => router.push("/orders/new")}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Order
+        <Button
+          onClick={() => {
+            setIsAddingOrder(true);
+            router.push("/orders/new");
+          }}
+          disabled={isAddingOrder}
+        >
+          {isAddingOrder ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Plus className="mr-2 h-4 w-4" />
+          )}
+          {isAddingOrder ? "Loading" : "Add Order"}
         </Button>
       </div>
 
-      {error && (
-        <div className="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+
 
       <Card>
         <CardHeader>
@@ -226,13 +247,22 @@ export default function OrdersPage() {
                       className="border-b border-gray-100 hover:bg-gray-50"
                     >
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        <button
-                          onClick={() => router.push(`/orders/${order.id}`)}
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            setNavigatingOrderId(order.id);
+                            router.push(`/orders/${order.id}`);
+                          }}
                           className="flex items-center gap-2 font-medium text-blue-600 hover:underline"
+                          disabled={navigatingOrderId === order.id}
                         >
-                          <ShoppingCart className="h-4 w-4" />
+                          {navigatingOrderId === order.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <ShoppingCart className="h-4 w-4" />
+                          )}
                           {order.order_number}
-                        </button>
+                        </Button>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
                         {order.title}
@@ -267,18 +297,32 @@ export default function OrdersPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => router.push(`/orders/${order.id}`)}
+                            onClick={() => {
+                              setNavigatingOrderId(order.id);
+                              router.push(`/orders/${order.id}`);
+                            }}
+                            disabled={navigatingOrderId === order.id}
                           >
-                            View
+                            {navigatingOrderId === order.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "View"
+                            )}
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() =>
-                              router.push(`/orders/${order.id}/edit`)
-                            }
+                            onClick={() => {
+                              setNavigatingEditId(order.id);
+                              router.push(`/orders/${order.id}/edit`);
+                            }}
+                            disabled={navigatingEditId === order.id}
                           >
-                            <Edit className="h-4 w-4" />
+                            {navigatingEditId === order.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Edit className="h-4 w-4" />
+                            )}
                           </Button>
                           <Button
                             variant="ghost"

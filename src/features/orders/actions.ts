@@ -26,8 +26,7 @@ export async function getOrders(filters?: {
       *,
       employees (id, full_name)
     `,
-    )
-    .order("created_at", { ascending: false });
+    );
 
   if (filters?.search) {
     query = query.or(
@@ -55,18 +54,16 @@ export async function getOrders(filters?: {
     ] as const;
     if (validFields.includes(field as (typeof validFields)[number])) {
       query = query.order(
-        field as
-          | "order_number"
-          | "title"
-          | "client_name"
-          | "order_date"
-          | "status"
-          | "created_at",
+        field as (typeof validFields)[number],
         {
           ascending: direction === "asc",
         },
       );
+    } else {
+      query = query.order("created_at", { ascending: false });
     }
+  } else {
+    query = query.order("created_at", { ascending: false });
   }
 
   const { data, error } = await query;
@@ -345,7 +342,7 @@ export async function changeOrderStatus(
 
   if (error) {
     console.error("Error changing order status:", error);
-    throw error;
+    throw new Error(error.message || "Failed to change order status");
   }
 
   revalidatePath("/orders");
@@ -379,11 +376,19 @@ export async function getOrderNotes(orderId: string) {
 export async function addOrderNote(orderId: string, content: string) {
   const supabase = await createClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error("User not authenticated");
+  }
+
   const { data, error } = await supabase
     .from("order_notes")
     .insert({
       order_id: orderId,
       content: content,
+      created_by: user.id,
     })
     .select(
       `

@@ -219,6 +219,33 @@ export async function getUsers() {
 }
 
 /**
+ * Get the currently logged-in user's profile (full_name, email)
+ */
+export async function getCurrentUserProfile() {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return { error: "Not authenticated" };
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("full_name, email")
+      .eq("id", user.id)
+      .single();
+
+    if (error) return { error: error.message };
+
+    return { success: true, data };
+  } catch (error) {
+    console.error("Get current user profile error:", error);
+    return { error: "An unexpected error occurred" };
+  }
+}
+
+/**
  * Get a single user by ID
  */
 export async function getUserById(userId: string) {

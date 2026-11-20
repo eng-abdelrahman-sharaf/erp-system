@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/AlertDialog";
 import {
   ArrowLeft,
+  Loader2,
   ShoppingCart,
   Package,
   FileText,
@@ -60,9 +62,16 @@ function OrderDetailsContent() {
   const router = useRouter();
   const params = useParams();
   const orderId = params.id as string;
+  const [isNavigatingBack, setIsNavigatingBack] = useState(false);
+  const [isNavigatingEdit, setIsNavigatingEdit] = useState(false);
 
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setErrorState] = useState("");
+
+  const setError = (msg: string) => {
+    setErrorState(msg);
+    if (msg) toast.error(msg);
+  };
   const [order, setOrder] = useState<OrderWithEmployee | null>(null);
   const [inventory, setInventory] = useState<OrderInventoryWithDetails[]>([]);
   const [notes, setNotes] = useState<OrderNoteWithProfile[]>([]);
@@ -182,20 +191,53 @@ function OrderDetailsContent() {
       return;
     }
 
+    const previousInventory = inventory;
+    const selectedItem = inventoryItems.find(
+      (i) => i.id === inventoryForm.item_id,
+    );
+    const selectedWarehouse = warehouses.find(
+      (w) => w.id === inventoryForm.warehouse_id,
+    );
+    const tempOrderInv: OrderInventoryWithDetails = {
+      id: `temp-${Date.now()}`,
+      order_id: orderId,
+      item_id: inventoryForm.item_id,
+      warehouse_id: inventoryForm.warehouse_id,
+      quantity,
+      unit: selectedItem?.unit || "",
+      created_at: new Date().toISOString(),
+      inventory_items: {
+        id: inventoryForm.item_id,
+        name: selectedItem?.name || "",
+        sku: selectedItem?.sku || "",
+      },
+      warehouses: {
+        id: inventoryForm.warehouse_id,
+        name: selectedWarehouse?.name || "",
+      },
+    };
+
+    // Optimistically update inventory table immediately
+    setInventory((prev) => [...prev, tempOrderInv]);
+    const savedItemId = inventoryForm.item_id;
+    const savedWarehouseId = inventoryForm.warehouse_id;
+    setInventoryForm({ item_id: "", warehouse_id: "", quantity: "" });
+    setAvailableStock(null);
+
     try {
       await reserveOrderInventory(
         orderId,
-        inventoryForm.item_id,
-        inventoryForm.warehouse_id,
+        savedItemId,
+        savedWarehouseId,
         quantity,
       );
+      toast.success("Inventory reserved successfully");
       const updatedInventory = await getOrderInventory(orderId);
       setInventory(updatedInventory);
       const updatedActivity = await getOrderActivityLogs(orderId);
       setActivityLogs(updatedActivity);
-      setInventoryForm({ item_id: "", warehouse_id: "", quantity: "" });
-      setAvailableStock(null);
     } catch (err) {
+      setInventory(previousInventory);
       setError(
         err instanceof Error ? err.message : "Failed to reserve inventory",
       );
@@ -211,21 +253,26 @@ function OrderDetailsContent() {
 
   const confirmRemoveInventory = async () => {
     if (!inventoryToRemove) return;
+    const id = inventoryToRemove;
+    const prevInventory = inventory;
+
+    // Immediate optimistic removal
+    setRemoveInventoryDialogOpen(false);
+    setInventoryToRemove(null);
+    setInventory((prev) => prev.filter((item) => item.id !== id));
 
     try {
-      await removeOrderInventory(inventoryToRemove, orderId);
+      await removeOrderInventory(id, orderId);
+      toast.success("Inventory item removed");
       const updatedInventory = await getOrderInventory(orderId);
       setInventory(updatedInventory);
       const updatedActivity = await getOrderActivityLogs(orderId);
       setActivityLogs(updatedActivity);
-      setRemoveInventoryDialogOpen(false);
-      setInventoryToRemove(null);
     } catch (err) {
+      setInventory(prevInventory);
       setError(
         err instanceof Error ? err.message : "Failed to remove inventory",
       );
-      setRemoveInventoryDialogOpen(false);
-      setInventoryToRemove(null);
     }
   };
 
@@ -264,8 +311,14 @@ function OrderDetailsContent() {
       setOrder(updatedOrder);
       const updatedActivity = await getOrderActivityLogs(orderId);
       setActivityLogs(updatedActivity);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to change status");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else if (typeof err === "object" && err !== null && "message" in err) {
+        setError(String((err as { message: unknown }).message));
+      } else {
+        setError("Failed to change status");
+      }
     } finally {
       setChangingStatus(false);
     }
@@ -290,8 +343,14 @@ function OrderDetailsContent() {
       setActivityLogs(updatedActivity);
       setStatusChangeDialogOpen(false);
       setStatusToChange(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to change status");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else if (typeof err === "object" && err !== null && "message" in err) {
+        setError(String((err as { message: unknown }).message));
+      } else {
+        setError("Failed to change status");
+      }
       setStatusChangeDialogOpen(false);
       setStatusToChange(null);
     } finally {
@@ -340,9 +399,17 @@ function OrderDetailsContent() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => router.push("/orders")}
+            onClick={() => {
+              setIsNavigatingBack(true);
+              router.push("/orders");
+            }}
+            disabled={isNavigatingBack}
           >
-            <ArrowLeft className="h-4 w-4" />
+            {isNavigatingBack ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ArrowLeft className="h-4 w-4" />
+            )}
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
@@ -355,9 +422,16 @@ function OrderDetailsContent() {
           {canEdit && (
             <Button
               variant="ghost"
-              onClick={() => router.push(`/orders/${orderId}/edit`)}
+              onClick={() => {
+                setIsNavigatingEdit(true);
+                router.push(`/orders/${orderId}/edit`);
+              }}
+              disabled={isNavigatingEdit}
             >
-              Edit Order
+              {isNavigatingEdit ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              {isNavigatingEdit ? "Loading" : "Edit Order"}
             </Button>
           )}
           {order.status === "pending" && (
@@ -396,7 +470,8 @@ function OrderDetailsContent() {
       {/* Tabs */}
       <div className="mb-4 border-b border-gray-200">
         <nav className="flex gap-4">
-          <button
+          <Button
+            variant="ghost"
             onClick={() => setActiveTab("overview")}
             className={`pb-2 px-1 text-sm font-medium ${
               activeTab === "overview"
@@ -406,8 +481,9 @@ function OrderDetailsContent() {
           >
             <ShoppingCart className="mr-1 inline h-4 w-4" />
             Overview
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
             onClick={() => setActiveTab("inventory")}
             className={`pb-2 px-1 text-sm font-medium ${
               activeTab === "inventory"
@@ -417,8 +493,9 @@ function OrderDetailsContent() {
           >
             <Package className="mr-1 inline h-4 w-4" />
             Inventory ({inventory.length})
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
             onClick={() => setActiveTab("notes")}
             className={`pb-2 px-1 text-sm font-medium ${
               activeTab === "notes"
@@ -428,8 +505,9 @@ function OrderDetailsContent() {
           >
             <FileText className="mr-1 inline h-4 w-4" />
             Notes ({notes.length})
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
             onClick={() => setActiveTab("activity")}
             className={`pb-2 px-1 text-sm font-medium ${
               activeTab === "activity"
@@ -439,7 +517,7 @@ function OrderDetailsContent() {
           >
             <Clock className="mr-1 inline h-4 w-4" />
             Activity ({activityLogs.length})
-          </button>
+          </Button>
         </nav>
       </div>
 

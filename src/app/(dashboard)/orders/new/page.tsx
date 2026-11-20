@@ -1,7 +1,8 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -13,13 +14,19 @@ import {
   SelectValue,
 } from "@/components/ui/SelectShadcn";
 import { DatePicker } from "@/components/ui/DatePicker";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { createOrder, getActiveEmployees } from "@/features/orders/actions";
 
 function NewOrderContent() {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setErrorState] = useState("");
+
+  const setError = (msg: string) => {
+    setErrorState(msg);
+    if (msg) toast.error(msg);
+  };
   const [employees, setEmployees] = useState<
     { id: string; full_name: string }[]
   >([]);
@@ -76,7 +83,7 @@ function NewOrderContent() {
             : form.order_date,
         notes: form.notes || null,
       });
-      router.push("/orders");
+      startTransition(() => router.push("/orders"));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create order");
       setLoading(false);
@@ -89,9 +96,11 @@ function NewOrderContent() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => router.push("/orders")}
+          onClick={() => startTransition(() => router.push("/orders"))}
+          disabled={isPending}
         >
           <ArrowLeft className="h-4 w-4" />
+          {isPending ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : null}
         </Button>
         <h1 className="text-2xl font-bold text-gray-900">Create New Order</h1>
       </div>
@@ -217,10 +226,13 @@ function NewOrderContent() {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => router.push("/orders")}
-                disabled={loading}
+                onClick={() => startTransition(() => router.push("/orders"))}
+                disabled={loading || isPending}
               >
-                Cancel
+                {isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                {isPending ? "Loading" : "Cancel"}
               </Button>
               <Button type="submit" disabled={loading}>
                 {loading ? "Creating..." : "Create Order"}

@@ -1,7 +1,8 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useTransition } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -13,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/SelectShadcn";
 import { DatePicker } from "@/components/ui/DatePicker";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import {
   getOrder,
   updateOrder,
@@ -25,10 +26,16 @@ function EditOrderContent() {
   const router = useRouter();
   const params = useParams();
   const orderId = params.id as string;
+  const [isPending, startTransition] = useTransition();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setErrorState] = useState("");
+
+  const setError = (msg: string) => {
+    setErrorState(msg);
+    if (msg) toast.error(msg);
+  };
   const [order, setOrder] = useState<OrderWithEmployee | null>(null);
   const [employees, setEmployees] = useState<
     { id: string; full_name: string }[]
@@ -108,7 +115,7 @@ function EditOrderContent() {
             : form.order_date,
         notes: form.notes || null,
       });
-      router.push(`/orders/${orderId}`);
+      startTransition(() => router.push(`/orders/${orderId}`));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update order");
       setSaving(false);
@@ -131,9 +138,13 @@ function EditOrderContent() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => router.push(`/orders/${orderId}`)}
+            onClick={() =>
+              startTransition(() => router.push(`/orders/${orderId}`))
+            }
+            disabled={isPending}
           >
             <ArrowLeft className="h-4 w-4" />
+            {isPending ? "Loading..." : ""}
           </Button>
           <h1 className="text-2xl font-bold text-gray-900">Edit Order</h1>
         </div>
@@ -276,10 +287,15 @@ function EditOrderContent() {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => router.push(`/orders/${orderId}`)}
-                disabled={saving}
+                onClick={() =>
+                  startTransition(() => router.push(`/orders/${orderId}`))
+                }
+                disabled={saving || isPending}
               >
-                Cancel
+                {isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                {isPending ? "Loading" : "Cancel"}
               </Button>
               <Button type="submit" disabled={saving}>
                 {saving ? "Saving..." : "Save Changes"}
