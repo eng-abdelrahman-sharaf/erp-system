@@ -1,7 +1,9 @@
 "use client";
 
 import { Suspense, useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useParams } from "next/navigation";
+import { useAppRouter } from "@/hooks/useAppRouter";
+import { BackButton } from "@/components/shared/BackButton";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -59,11 +61,11 @@ import type {
 } from "@/features/orders/types";
 
 function OrderDetailsContent() {
-  const router = useRouter();
+  const router = useAppRouter();
   const params = useParams();
   const orderId = params.id as string;
-  const [isNavigatingBack, setIsNavigatingBack] = useState(false);
-  const [isNavigatingEdit, setIsNavigatingEdit] = useState(false);
+
+  const isNavigatingEdit = router.isNavigatingTarget("edit");
 
   const [loading, setLoading] = useState(true);
   const [error, setErrorState] = useState("");
@@ -396,21 +398,7 @@ function OrderDetailsContent() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setIsNavigatingBack(true);
-              router.push("/orders");
-            }}
-            disabled={isNavigatingBack}
-          >
-            {isNavigatingBack ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <ArrowLeft className="h-4 w-4" />
-            )}
-          </Button>
+          <BackButton href="/orders" />
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
               {order.order_number}
@@ -419,21 +407,24 @@ function OrderDetailsContent() {
           </div>
         </div>
         <div className="flex gap-2">
-          {canEdit && (
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setIsNavigatingEdit(true);
-                router.push(`/orders/${orderId}/edit`);
-              }}
-              disabled={isNavigatingEdit}
-            >
-              {isNavigatingEdit ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              {isNavigatingEdit ? "Loading" : "Edit Order"}
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            onClick={() => {
+              if (!canEdit) return;
+              router.push(`/orders/${orderId}/edit`, { target: "edit" });
+            }}
+            disabled={!canEdit || isNavigatingEdit}
+            title={
+              !canEdit
+                ? "Paid and cancelled orders cannot be edited"
+                : "Edit Order"
+            }
+          >
+            {isNavigatingEdit ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : null}
+            {isNavigatingEdit ? "Loading" : "Edit Order"}
+          </Button>
           {order.status === "pending" && (
             <Button onClick={handleStartProgress} disabled={changingStatus}>
               Start Progress
@@ -765,12 +756,15 @@ function OrderDetailsContent() {
                           className="border-b border-gray-100 hover:bg-gray-50"
                         >
                           <td className="px-4 py-3 text-sm text-gray-700">
-                            <div>
-                              <div className="font-medium">
-                                {inv.inventory_items.name}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {inv.inventory_items.sku}
+                            <div className="flex items-center gap-2">
+                              <Package className="h-4 w-4 text-gray-500 shrink-0" />
+                              <div>
+                                <div className="font-medium">
+                                  {inv.inventory_items.name}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {inv.inventory_items.sku}
+                                </div>
                               </div>
                             </div>
                           </td>

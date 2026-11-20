@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useState, useEffect, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, useEffect } from "react";
+import { useAppRouter } from "@/hooks/useAppRouter";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -13,13 +13,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/SelectShadcn";
-import { DatePicker } from "@/components/ui/DatePicker";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { DatePicker, formatDateToYYYYMMDD } from "@/components/ui/DatePicker";
+import { Loader2 } from "lucide-react";
+import { BackButton } from "@/components/shared/BackButton";
 import { createOrder, getActiveEmployees } from "@/features/orders/actions";
 
 function NewOrderContent() {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const router = useAppRouter();
   const [loading, setLoading] = useState(false);
   const [error, setErrorState] = useState("");
 
@@ -77,13 +77,10 @@ function NewOrderContent() {
         client_address: form.client_address || null,
         employee_id: form.employee_id || null,
         status: "pending",
-        order_date:
-          form.order_date instanceof Date
-            ? form.order_date.toISOString().split("T")[0]
-            : form.order_date,
+        order_date: formatDateToYYYYMMDD(form.order_date),
         notes: form.notes || null,
       });
-      startTransition(() => router.push("/orders"));
+      router.push("/orders");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create order");
       setLoading(false);
@@ -93,15 +90,7 @@ function NewOrderContent() {
   return (
     <div>
       <div className="mb-6 flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => startTransition(() => router.push("/orders"))}
-          disabled={isPending}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          {isPending ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : null}
-        </Button>
+        <BackButton href="/orders" />
         <h1 className="text-2xl font-bold text-gray-900">Create New Order</h1>
       </div>
 
@@ -226,13 +215,13 @@ function NewOrderContent() {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => startTransition(() => router.push("/orders"))}
-                disabled={loading || isPending}
+                onClick={() => router.push("/orders", { target: "cancel" })}
+                disabled={loading || router.isNavigatingTarget("cancel")}
               >
-                {isPending ? (
+                {router.isNavigatingTarget("cancel") ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
-                {isPending ? "Loading" : "Cancel"}
+                {router.isNavigatingTarget("cancel") ? "Loading" : "Cancel"}
               </Button>
               <Button type="submit" disabled={loading}>
                 {loading ? "Creating..." : "Create Order"}

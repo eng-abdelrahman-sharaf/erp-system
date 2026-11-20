@@ -24,7 +24,8 @@ export async function getOrders(filters?: {
     .select(
       `
       *,
-      employees (id, full_name)
+      employees (id, full_name),
+      order_inventory (id)
     `,
     );
 
@@ -186,7 +187,12 @@ export async function deleteOrder(id: string) {
 
   if (error) {
     console.error("Error deleting order:", error);
-    throw error;
+    if (error.code === "23503") {
+      throw new Error(
+        "Orders cannot be deleted once created because audit activity logs are immutable. Please cancel the order instead.",
+      );
+    }
+    throw new Error(error.message || "Failed to delete order");
   }
 
   revalidatePath("/orders");

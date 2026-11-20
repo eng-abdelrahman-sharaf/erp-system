@@ -1,7 +1,9 @@
 "use client";
 
-import { Suspense, useState, useEffect, useTransition } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { Suspense, useState, useEffect } from "react";
+import { useParams } from "next/navigation";
+import { useAppRouter } from "@/hooks/useAppRouter";
+import { BackButton } from "@/components/shared/BackButton";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -13,8 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/SelectShadcn";
-import { DatePicker } from "@/components/ui/DatePicker";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { DatePicker, formatDateToYYYYMMDD, parseDateSafe } from "@/components/ui/DatePicker";
+import { Loader2 } from "lucide-react";
 import {
   getOrder,
   updateOrder,
@@ -23,10 +25,9 @@ import {
 import type { OrderWithEmployee } from "@/features/orders/types";
 
 function EditOrderContent() {
-  const router = useRouter();
+  const router = useAppRouter();
   const params = useParams();
   const orderId = params.id as string;
-  const [isPending, startTransition] = useTransition();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -70,7 +71,7 @@ function EditOrderContent() {
             client_phone: orderData.client_phone || "",
             client_address: orderData.client_address || "",
             employee_id: orderData.employee_id || "",
-            order_date: new Date(orderData.order_date),
+            order_date: parseDateSafe(orderData.order_date) || new Date(),
             notes: orderData.notes || "",
           });
         }
@@ -109,13 +110,10 @@ function EditOrderContent() {
         client_phone: form.client_phone || null,
         client_address: form.client_address || null,
         employee_id: form.employee_id || null,
-        order_date:
-          form.order_date instanceof Date
-            ? form.order_date.toISOString().split("T")[0]
-            : form.order_date,
+        order_date: formatDateToYYYYMMDD(form.order_date),
         notes: form.notes || null,
       });
-      startTransition(() => router.push(`/orders/${orderId}`));
+      router.push(`/orders/${orderId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update order");
       setSaving(false);
@@ -135,17 +133,7 @@ function EditOrderContent() {
     return (
       <div>
         <div className="mb-6 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() =>
-              startTransition(() => router.push(`/orders/${orderId}`))
-            }
-            disabled={isPending}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            {isPending ? "Loading..." : ""}
-          </Button>
+          <BackButton href={`/orders/${orderId}`} />
           <h1 className="text-2xl font-bold text-gray-900">Edit Order</h1>
         </div>
         <Card>
@@ -163,13 +151,7 @@ function EditOrderContent() {
   return (
     <div>
       <div className="mb-6 flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.push(`/orders/${orderId}`)}
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
+        <BackButton href={`/orders/${orderId}`} />
         <h1 className="text-2xl font-bold text-gray-900">Edit Order</h1>
       </div>
 
@@ -288,14 +270,14 @@ function EditOrderContent() {
                 type="button"
                 variant="ghost"
                 onClick={() =>
-                  startTransition(() => router.push(`/orders/${orderId}`))
+                  router.push(`/orders/${orderId}`, { target: "cancel" })
                 }
-                disabled={saving || isPending}
+                disabled={saving || router.isNavigatingTarget("cancel")}
               >
-                {isPending ? (
+                {router.isNavigatingTarget("cancel") ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
-                {isPending ? "Loading" : "Cancel"}
+                {router.isNavigatingTarget("cancel") ? "Loading" : "Cancel"}
               </Button>
               <Button type="submit" disabled={saving}>
                 {saving ? "Saving..." : "Save Changes"}

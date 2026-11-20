@@ -25,6 +25,7 @@ export interface OrderWithEmployee extends Order {
     id: string;
     full_name: string;
   } | null;
+  order_inventory?: { id: string }[];
 }
 
 export interface OrderInventory {

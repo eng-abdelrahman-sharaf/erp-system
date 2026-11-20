@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { DatePicker } from "@/components/ui/DatePicker";
+import { DatePicker, formatDateToYYYYMMDD } from "@/components/ui/DatePicker";
 import {
   Select as SelectShadcn,
   SelectContent,
@@ -76,8 +76,8 @@ export default function ReportsPage() {
 
   const getReportFilters = (): ReportFilters => {
     const filters: ReportFilters = {};
-    if (startDate) filters.startDate = startDate.toISOString().split("T")[0];
-    if (endDate) filters.endDate = endDate.toISOString().split("T")[0];
+    if (startDate) filters.startDate = formatDateToYYYYMMDD(startDate);
+    if (endDate) filters.endDate = formatDateToYYYYMMDD(endDate);
     if (warehouseId) filters.warehouseId = warehouseId;
     if (employeeId) filters.employeeId = employeeId;
     if (orderStatus) filters.orderStatus = orderStatus;

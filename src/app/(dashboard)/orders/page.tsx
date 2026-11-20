@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/hooks/useAppRouter";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -23,20 +23,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/AlertDialog";
-import { Plus, Edit, Trash2, ShoppingCart, Loader2 } from "lucide-react";
+import { Plus, Edit, Trash2, ShoppingCart, Loader2, Eye } from "lucide-react";
+import { cn } from "@/lib/utils/cn";
 import { getOrders, deleteOrder } from "@/features/orders/actions";
 import type { OrderWithEmployee } from "@/features/orders/types";
 
 export default function OrdersPage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const [orders, setOrders] = useState<OrderWithEmployee[]>([]);
   const [loading, setLoading] = useState(true);
-  // error state removed; toast handling only
-  const [isAddingOrder, setIsAddingOrder] = useState(false);
-  const [navigatingOrderId, setNavigatingOrderId] = useState<string | null>(null);
-  const [navigatingEditId, setNavigatingEditId] = useState<string | null>(null);
 
-  const setError = (msg: string) => { if (msg) toast.error(msg); };
+  const isAddingOrder = router.isNavigatingTarget("new");
+  const isNavigatingOrder = (id: string) =>
+    router.isNavigatingTarget(`view-${id}`);
+  const isNavigatingEdit = (id: string) =>
+    router.isNavigatingTarget(`edit-${id}`);
+
+  const setError = (msg: string) => {
+    if (msg) toast.error(msg);
+  };
 
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -49,7 +54,6 @@ export default function OrdersPage() {
 
   const loadData = async (showLoading = true) => {
     if (showLoading) setLoading(true);
-
 
     const filters: {
       search?: string;
@@ -72,7 +76,6 @@ export default function OrdersPage() {
 
   useEffect(() => {
     loadData(true);
-    setNavigatingOrderId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, statusFilter, sortBy]);
 
@@ -98,7 +101,9 @@ export default function OrdersPage() {
     } catch (err) {
       // Revert on error
       setOrders(previousOrders);
-      setError(err instanceof Error ? err.message : "Failed to delete order");
+      const msg = err instanceof Error ? err.message : "Failed to delete order";
+      setError(msg);
+      toast.error(msg);
     }
   };
 
@@ -132,8 +137,7 @@ export default function OrdersPage() {
         <h1 className="text-2xl font-bold text-gray-900">Orders</h1>
         <Button
           onClick={() => {
-            setIsAddingOrder(true);
-            router.push("/orders/new");
+            router.push("/orders/new", { target: "new" });
           }}
           disabled={isAddingOrder}
         >
@@ -241,100 +245,137 @@ export default function OrdersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.map((order) => (
-                    <tr
-                      key={order.id}
-                      className="border-b border-gray-100 hover:bg-gray-50"
-                    >
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <Button
-                          variant="ghost"
-                          onClick={() => {
-                            setNavigatingOrderId(order.id);
-                            router.push(`/orders/${order.id}`);
-                          }}
-                          className="flex items-center gap-2 font-medium text-blue-600 hover:underline"
-                          disabled={navigatingOrderId === order.id}
-                        >
-                          {navigatingOrderId === order.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <ShoppingCart className="h-4 w-4" />
-                          )}
-                          {order.order_number}
-                        </Button>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {order.title}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <div>
-                          <div className="font-medium">{order.client_name}</div>
-                          {order.client_phone && (
-                            <div className="text-xs text-gray-500">
-                              {order.client_phone}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {order.employees?.full_name || "-"}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {new Date(order.order_date).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span
-                          className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(
-                            order.status,
-                          )}`}
-                        >
-                          {formatStatus(order.status)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <div className="flex gap-2">
+                  {orders.map((order) => {
+                    const canEdit =
+                      order.status === "pending" || order.status === "in_progress";
+                    const canDelete = false;
+
+                    const getDeleteTitle = () => {
+                      if (order.status === "paid")
+                        return "Paid orders cannot be deleted";
+                      if (order.status === "cancelled")
+                        return "Cancelled orders cannot be deleted";
+                      return "Orders cannot be deleted once created to preserve audit history. Cancel the order instead.";
+                    };
+
+                    return (
+                      <tr
+                        key={order.id}
+                        className="border-b border-gray-100 hover:bg-gray-50"
+                      >
+                        <td className="px-4 py-3 text-sm text-gray-700">
                           <Button
                             variant="ghost"
-                            size="sm"
                             onClick={() => {
-                              setNavigatingOrderId(order.id);
-                              router.push(`/orders/${order.id}`);
+                              router.push(`/orders/${order.id}`, {
+                                target: `view-${order.id}`,
+                              });
                             }}
-                            disabled={navigatingOrderId === order.id}
+                            className="flex items-center gap-2 font-medium text-blue-600 hover:underline"
+                            disabled={isNavigatingOrder(order.id)}
                           >
-                            {navigatingOrderId === order.id ? (
+                            {isNavigatingOrder(order.id) ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              "View"
+                              <ShoppingCart className="h-4 w-4" />
                             )}
+                            {order.order_number}
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setNavigatingEditId(order.id);
-                              router.push(`/orders/${order.id}/edit`);
-                            }}
-                            disabled={navigatingEditId === order.id}
-                          >
-                            {navigatingEditId === order.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Edit className="h-4 w-4" />
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          {order.title}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <div>
+                            <div className="font-medium">{order.client_name}</div>
+                            {order.client_phone && (
+                              <div className="text-xs text-gray-500">
+                                {order.client_phone}
+                              </div>
                             )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(order.id)}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          {order.employees?.full_name || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          {new Date(order.order_date).toLocaleDateString()}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <span
+                            className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(
+                              order.status,
+                            )}`}
                           >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                            {formatStatus(order.status)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                router.push(`/orders/${order.id}`, {
+                                  target: `view-${order.id}`,
+                                });
+                              }}
+                              disabled={isNavigatingOrder(order.id)}
+                              title="View Order"
+                            >
+                              {isNavigatingOrder(order.id) ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Eye className="h-4 w-4 text-gray-600" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                router.push(`/orders/${order.id}/edit`, {
+                                  target: `edit-${order.id}`,
+                                });
+                              }}
+                              disabled={!canEdit || isNavigatingEdit(order.id)}
+                              title={
+                                !canEdit
+                                  ? "Paid and cancelled orders cannot be edited"
+                                  : "Edit Order"
+                              }
+                            >
+                              {isNavigatingEdit(order.id) ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Edit
+                                  className={cn(
+                                    "h-4 w-4",
+                                    canEdit ? "text-gray-600" : "text-gray-300",
+                                  )}
+                                />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(order.id)}
+                              disabled={!canDelete}
+                              title={getDeleteTitle()}
+                            >
+                              <Trash2
+                                className={cn(
+                                  "h-4 w-4",
+                                  canDelete
+                                    ? "text-red-500 hover:text-red-700"
+                                    : "text-gray-300",
+                                )}
+                              />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
