@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Table } from "@/components/ui/Table";
-import { ArrowLeft, Package } from "lucide-react";
+import { ArrowRightLeft, Package, Plus } from "lucide-react";
+import { BackButton } from "@/components/shared/BackButton";
 import { getWarehouseTransfers } from "@/features/inventory/actions";
 import type { WarehouseTransfer } from "@/features/inventory/types";
 
@@ -34,8 +36,12 @@ export default function TransfersPage() {
     {
       key: "item",
       header: "Item",
-      render: (row: WarehouseTransferWithNames) =>
-        row.inventory_items?.name || row.item_id,
+      render: (row: WarehouseTransferWithNames) => (
+        <span className="flex items-center gap-2 font-medium text-gray-900">
+          <Package className="h-4 w-4 text-gray-500" />
+          {row.inventory_items?.name || row.item_id}
+        </span>
+      ),
     },
     {
       key: "source_warehouse",
@@ -72,28 +78,35 @@ export default function TransfersPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/inventory/stock">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
-          </Link>
+          <BackButton href="/inventory/stock" label="Back" />
           <h1 className="text-2xl font-bold text-gray-900">
             Warehouse Transfers
           </h1>
         </div>
         <Link href="/inventory/transfers/new">
-          <Button>New Transfer</Button>
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            New Transfer
+          </Button>
         </Link>
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-8">
-          <Package className="h-8 w-8 animate-spin text-gray-400" />
-        </div>
-      ) : (
-        <Table columns={columns} data={transfers} />
-      )}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>All Transfers</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Package className="h-8 w-8 animate-spin text-gray-400" />
+            </div>
+          ) : (
+            <Table columns={columns} data={transfers} />
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -1,22 +1,21 @@
 "use client";
 
-import { Suspense, useState, useEffect, useTransition } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { Suspense, useState, useEffect } from "react";
+import { useParams } from "next/navigation";
+import { useAppRouter } from "@/hooks/useAppRouter";
+import { BackButton } from "@/components/shared/BackButton";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { ArrowLeft, Loader2 } from "lucide-react";
 import {
   getInventoryItem,
   updateInventoryItem,
 } from "@/features/inventory/actions";
-import Link from "next/link";
 
 function EditInventoryItemContent() {
-  const router = useRouter();
+  const router = useAppRouter();
   const params = useParams();
   const itemId = params.id as string;
-  const [isPending, startTransition] = useTransition();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -41,11 +40,11 @@ function EditInventoryItemContent() {
           });
         } else {
           toast.error("Item not found");
-          startTransition(() => router.push("/inventory"));
+          router.push("/inventory");
         }
       } catch {
         toast.error("Failed to load item");
-        startTransition(() => router.push("/inventory"));
+        router.push("/inventory");
       } finally {
         setLoading(false);
       }
@@ -81,7 +80,7 @@ function EditInventoryItemContent() {
     try {
       await updateInventoryItem(itemId, formData);
       toast.success("Item updated successfully");
-      startTransition(() => router.push(`/inventory/items/${itemId}`));
+      router.push(`/inventory/items/${itemId}`);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to update item",
@@ -98,16 +97,7 @@ function EditInventoryItemContent() {
   return (
     <div>
       <div className="mb-6 flex items-center gap-4">
-        <Link href={`/inventory/items/${itemId}`}>
-          <Button variant="ghost" size="sm" disabled={isPending}>
-            {isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <ArrowLeft className="mr-2 h-4 w-4" />
-            )}
-            {isPending ? "Loading" : "Back"}
-          </Button>
-        </Link>
+        <BackButton href={`/inventory/items/${itemId}`} label="Back" />
         <h1 className="text-2xl font-bold text-gray-900">
           Edit Inventory Item
         </h1>
@@ -159,14 +149,16 @@ function EditInventoryItemContent() {
           <Button type="submit" disabled={saving}>
             {saving ? "Saving..." : "Save Changes"}
           </Button>
-          <Link href={`/inventory/items/${itemId}`}>
-            <Button type="button" variant="secondary" disabled={isPending}>
-              {isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              {isPending ? "Loading" : "Cancel"}
-            </Button>
-          </Link>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() =>
+              router.push(`/inventory/items/${itemId}`, { target: "cancel" })
+            }
+            disabled={router.isNavigatingTarget("cancel")}
+          >
+            {router.isNavigatingTarget("cancel") ? "Loading..." : "Cancel"}
+          </Button>
         </div>
       </form>
     </div>

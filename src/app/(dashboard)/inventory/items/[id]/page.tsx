@@ -3,8 +3,11 @@
 import { Suspense, useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Table } from "@/components/ui/Table";
-import { ArrowLeft, Edit, Package } from "lucide-react";
+import { Package, Warehouse } from "lucide-react";
+import { BackButton } from "@/components/shared/BackButton";
+import { EditButton } from "@/components/shared/NavigationActions";
 import {
   getInventoryItem,
   getInventorySummary,
@@ -59,7 +62,16 @@ function InventoryItemDetailsContent() {
   }
 
   const stockColumns = [
-    { key: "warehouse_name", header: "Warehouse" },
+    {
+      key: "warehouse_name",
+      header: "Warehouse",
+      render: (row: InventorySummary) => (
+        <span className="flex items-center gap-2 font-medium text-gray-900">
+          <Warehouse className="h-4 w-4 text-gray-500" />
+          {row.warehouse_name}
+        </span>
+      ),
+    },
     {
       key: "total_quantity",
       header: "Total",
@@ -88,20 +100,16 @@ function InventoryItemDetailsContent() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/inventory">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
-          </Link>
+          <BackButton href="/inventory" label="Back" />
           <h1 className="text-2xl font-bold text-gray-900">{item.name}</h1>
         </div>
-        <Link href={`/inventory/items/${item.id}/edit`}>
-          <Button>
-            <Edit className="mr-2 h-4 w-4" />
-            Edit Item
-          </Button>
-        </Link>
+        <EditButton
+          href={`/inventory/items/${item.id}/edit`}
+          variant="default"
+          size="default"
+        >
+          Edit Item
+        </EditButton>
       </div>
 
       <div className="mb-8 rounded-lg border border-gray-200 bg-white p-6">
@@ -132,18 +140,20 @@ function InventoryItemDetailsContent() {
         </div>
       </div>
 
-      <div>
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">
-          Stock by Warehouse
-        </h2>
-        {stock.length === 0 ? (
-          <p className="text-sm text-gray-500">
-            No stock records found for this item
-          </p>
-        ) : (
-          <Table columns={stockColumns} data={stock} />
-        )}
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Stock by Warehouse</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {stock.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              No stock records found for this item
+            </p>
+          ) : (
+            <Table columns={stockColumns} data={stock} />
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

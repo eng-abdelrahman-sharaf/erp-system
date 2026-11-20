@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import {
   Select as SelectShadcn,
@@ -22,7 +23,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/AlertDialog";
-import { Plus, Search, Package } from "lucide-react";
+import { Plus, Search, Package, Trash2 } from "lucide-react";
+import { ViewButton, EditButton } from "@/components/shared/NavigationActions";
 import {
   getInventoryItems,
   deleteInventoryItem,
@@ -76,7 +78,19 @@ export default function InventoryPage() {
   }
 
   const columns = [
-    { key: "name", header: "Name" },
+    {
+      key: "name",
+      header: "Name",
+      render: (row: InventoryItem) => (
+        <Link
+          href={`/inventory/items/${row.id}`}
+          className="flex items-center gap-2 font-medium text-blue-600 hover:underline"
+        >
+          <Package className="h-4 w-4" />
+          {row.name}
+        </Link>
+      ),
+    },
     { key: "sku", header: "SKU" },
     { key: "unit", header: "Unit" },
     {
@@ -101,22 +115,21 @@ export default function InventoryPage() {
       header: "Actions",
       render: (row: InventoryItem) => (
         <div className="flex gap-2">
-          <Link href={`/inventory/items/${row.id}`}>
-            <Button variant="ghost" size="sm">
-              View
-            </Button>
-          </Link>
-          <Link href={`/inventory/items/${row.id}/edit`}>
-            <Button variant="ghost" size="sm">
-              Edit
-            </Button>
-          </Link>
+          <ViewButton
+            href={`/inventory/items/${row.id}`}
+            title="View Item"
+          />
+          <EditButton
+            href={`/inventory/items/${row.id}/edit`}
+            title="Edit Item"
+          />
           <Button
-            variant="danger"
+            variant="ghost"
             size="sm"
             onClick={() => handleDelete(row.id)}
+            title="Delete Item"
           >
-            Delete
+            <Trash2 className="h-4 w-4 text-red-500 hover:text-red-700" />
           </Button>
         </div>
       ),
@@ -135,41 +148,49 @@ export default function InventoryPage() {
         </Link>
       </div>
 
-      <div className="mb-4 flex gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <Input
-            placeholder="Search by name or SKU..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <SelectShadcn
-          value={sortBy}
-          onValueChange={(value) => setSortBy(value)}
-        >
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Sort by" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="created_at-desc">Newest First</SelectItem>
-            <SelectItem value="created_at-asc">Oldest First</SelectItem>
-            <SelectItem value="name-asc">Name (A-Z)</SelectItem>
-            <SelectItem value="name-desc">Name (Z-A)</SelectItem>
-            <SelectItem value="sku-asc">SKU (A-Z)</SelectItem>
-            <SelectItem value="sku-desc">SKU (Z-A)</SelectItem>
-          </SelectContent>
-        </SelectShadcn>
-      </div>
-
-      {loading ? (
-        <div className="flex items-center justify-center py-8">
-          <Package className="h-8 w-8 animate-spin text-gray-400" />
-        </div>
-      ) : (
-        <Table columns={columns} data={items} />
-      )}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle>All Inventory Items</CardTitle>
+            <div className="flex flex-1 items-center justify-end gap-2">
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Input
+                  placeholder="Search by name or SKU..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <SelectShadcn
+                value={sortBy}
+                onValueChange={(value) => setSortBy(value)}
+              >
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="created_at-desc">Newest First</SelectItem>
+                  <SelectItem value="created_at-asc">Oldest First</SelectItem>
+                  <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                  <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+                  <SelectItem value="sku-asc">SKU (A-Z)</SelectItem>
+                  <SelectItem value="sku-desc">SKU (Z-A)</SelectItem>
+                </SelectContent>
+              </SelectShadcn>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Package className="h-8 w-8 animate-spin text-gray-400" />
+            </div>
+          ) : (
+            <Table columns={columns} data={items} />
+          )}
+        </CardContent>
+      </Card>
 
       <AlertDialog
         open={deleteId !== null}

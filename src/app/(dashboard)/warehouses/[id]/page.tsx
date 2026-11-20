@@ -3,11 +3,12 @@
 import { Suspense, useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Table } from "@/components/ui/Table";
-import { ArrowLeft, Edit, Warehouse as WarehouseIcon } from "lucide-react";
+import { Package, Warehouse as WarehouseIcon } from "lucide-react";
+import { BackButton } from "@/components/shared/BackButton";
+import { EditButton } from "@/components/shared/NavigationActions";
 import { getWarehouse, getWarehouseStock } from "@/features/inventory/actions";
-import type { Warehouse, InventorySummary } from "@/features/inventory/types";
-import Link from "next/link";
 
 function WarehouseDetailsContent() {
   const params = useParams();
@@ -51,7 +52,16 @@ function WarehouseDetailsContent() {
   }
 
   const stockColumns = [
-    { key: "item_name", header: "Item" },
+    {
+      key: "item_name",
+      header: "Item",
+      render: (row: InventorySummary) => (
+        <span className="flex items-center gap-2 font-medium text-gray-900">
+          <Package className="h-4 w-4 text-gray-500" />
+          {row.item_name}
+        </span>
+      ),
+    },
     { key: "sku", header: "SKU" },
     { key: "unit", header: "Unit" },
     {
@@ -82,20 +92,16 @@ function WarehouseDetailsContent() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/warehouses">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
-          </Link>
+          <BackButton href="/warehouses" label="Back" />
           <h1 className="text-2xl font-bold text-gray-900">{warehouse.name}</h1>
         </div>
-        <Link href={`/warehouses/${warehouse.id}/edit`}>
-          <Button>
-            <Edit className="mr-2 h-4 w-4" />
-            Edit Warehouse
-          </Button>
-        </Link>
+        <EditButton
+          href={`/warehouses/${warehouse.id}/edit`}
+          variant="default"
+          size="default"
+        >
+          Edit Warehouse
+        </EditButton>
       </div>
 
       <div className="mb-8 rounded-lg border border-gray-200 bg-white p-6">
@@ -124,18 +130,20 @@ function WarehouseDetailsContent() {
         </div>
       </div>
 
-      <div>
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">
-          Inventory Stock
-        </h2>
-        {stock.length === 0 ? (
-          <p className="text-sm text-gray-500">
-            No stock records found for this warehouse
-          </p>
-        ) : (
-          <Table columns={stockColumns} data={stock} />
-        )}
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Inventory Stock</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {stock.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              No stock records found for this warehouse
+            </p>
+          ) : (
+            <Table columns={stockColumns} data={stock} />
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

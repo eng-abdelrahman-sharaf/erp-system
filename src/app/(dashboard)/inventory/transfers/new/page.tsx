@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useAppRouter } from "@/hooks/useAppRouter";
+import { BackButton } from "@/components/shared/BackButton";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -12,17 +13,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/SelectShadcn";
-import { ArrowLeft, Loader2 } from "lucide-react";
 import {
   transferInventory,
   getInventoryItems,
   getWarehouses,
 } from "@/features/inventory/actions";
-import Link from "next/link";
 
 export default function NewTransferPage() {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const router = useAppRouter();
   const [formData, setFormData] = useState({
     item_id: "",
     source_warehouse_id: "",
@@ -101,7 +99,7 @@ export default function NewTransferPage() {
         formData.notes || undefined,
       );
       toast.success("Transfer completed successfully");
-      startTransition(() => router.push("/inventory/transfers"));
+      router.push("/inventory/transfers");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to transfer inventory",
@@ -114,16 +112,7 @@ export default function NewTransferPage() {
   return (
     <div>
       <div className="mb-6 flex items-center gap-4">
-        <Link href="/inventory/transfers">
-          <Button variant="ghost" size="sm" disabled={isPending}>
-            {isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <ArrowLeft className="mr-2 h-4 w-4" />
-            )}
-            {isPending ? "Loading" : "Back"}
-          </Button>
-        </Link>
+        <BackButton href="/inventory/transfers" label="Back" />
         <h1 className="text-2xl font-bold text-gray-900">New Transfer</h1>
       </div>
 
@@ -253,14 +242,16 @@ export default function NewTransferPage() {
           <Button type="submit" disabled={loading}>
             {loading ? "Processing..." : "Transfer"}
           </Button>
-          <Link href="/inventory/transfers">
-            <Button type="button" variant="secondary" disabled={isPending}>
-              {isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              {isPending ? "Loading" : "Cancel"}
-            </Button>
-          </Link>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() =>
+              router.push("/inventory/transfers", { target: "cancel" })
+            }
+            disabled={router.isNavigatingTarget("cancel")}
+          >
+            {router.isNavigatingTarget("cancel") ? "Loading..." : "Cancel"}
+          </Button>
         </div>
       </form>
     </div>

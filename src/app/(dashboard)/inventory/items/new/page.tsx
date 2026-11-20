@@ -1,18 +1,16 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { useAppRouter } from "@/hooks/useAppRouter";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { BackButton } from "@/components/shared/BackButton";
 import { createInventoryItem } from "@/features/inventory/actions";
-import Link from "next/link";
 import { InventoryItemCreateSchema } from "@/lib/validations";
 
 export default function NewInventoryItemPage() {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const router = useAppRouter();
   const [formData, setFormData] = useState({
     name: "",
     sku: "",
@@ -52,7 +50,7 @@ export default function NewInventoryItemPage() {
     try {
       await createInventoryItem(formData);
       toast.success("Inventory item created successfully");
-      startTransition(() => router.push("/inventory"));
+      router.push("/inventory");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to create item",
@@ -65,16 +63,7 @@ export default function NewInventoryItemPage() {
   return (
     <div>
       <div className="mb-6 flex items-center gap-4">
-        <Link href="/inventory">
-          <Button variant="ghost" size="sm" disabled={isPending}>
-            {isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <ArrowLeft className="mr-2 h-4 w-4" />
-            )}
-            {isPending ? "Loading" : "Back"}
-          </Button>
-        </Link>
+        <BackButton href="/inventory" label="Back" />
         <h1 className="text-2xl font-bold text-gray-900">New Inventory Item</h1>
       </div>
 
@@ -124,14 +113,14 @@ export default function NewInventoryItemPage() {
           <Button type="submit" disabled={loading}>
             {loading ? "Creating..." : "Create Item"}
           </Button>
-          <Link href="/inventory">
-            <Button type="button" variant="secondary" disabled={isPending}>
-              {isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              {isPending ? "Loading" : "Cancel"}
-            </Button>
-          </Link>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => router.push("/inventory", { target: "cancel" })}
+            disabled={router.isNavigatingTarget("cancel")}
+          >
+            {router.isNavigatingTarget("cancel") ? "Loading..." : "Cancel"}
+          </Button>
         </div>
       </form>
     </div>

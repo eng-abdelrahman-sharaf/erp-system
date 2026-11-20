@@ -1,18 +1,16 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { useAppRouter } from "@/hooks/useAppRouter";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { BackButton } from "@/components/shared/BackButton";
 import { createWarehouse } from "@/features/inventory/actions";
-import Link from "next/link";
 import { WarehouseCreateSchema } from "@/lib/validations";
 
 export default function NewWarehousePage() {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const router = useAppRouter();
   const [formData, setFormData] = useState({
     name: "",
     address: "",
@@ -51,7 +49,7 @@ export default function NewWarehousePage() {
     try {
       await createWarehouse(formData);
       toast.success("Warehouse created successfully");
-      startTransition(() => router.push("/warehouses"));
+      router.push("/warehouses");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to create warehouse",
@@ -64,16 +62,7 @@ export default function NewWarehousePage() {
   return (
     <div>
       <div className="mb-6 flex items-center gap-4">
-        <Link href="/warehouses">
-          <Button variant="ghost" size="sm" disabled={isPending}>
-            {isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <ArrowLeft className="mr-2 h-4 w-4" />
-            )}
-            {isPending ? "Loading" : "Back"}
-          </Button>
-        </Link>
+        <BackButton href="/warehouses" label="Back" />
         <h1 className="text-2xl font-bold text-gray-900">New Warehouse</h1>
       </div>
 
@@ -111,14 +100,14 @@ export default function NewWarehousePage() {
           <Button type="submit" disabled={loading}>
             {loading ? "Creating..." : "Create Warehouse"}
           </Button>
-          <Link href="/warehouses">
-            <Button type="button" variant="secondary" disabled={isPending}>
-              {isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              {isPending ? "Loading" : "Cancel"}
-            </Button>
-          </Link>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => router.push("/warehouses", { target: "cancel" })}
+            disabled={router.isNavigatingTarget("cancel")}
+          >
+            {router.isNavigatingTarget("cancel") ? "Loading..." : "Cancel"}
+          </Button>
         </div>
       </form>
     </div>

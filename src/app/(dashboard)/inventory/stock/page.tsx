@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import {
   Select as SelectShadcn,
   SelectContent,
@@ -10,7 +11,8 @@ import {
   SelectValue,
 } from "@/components/ui/SelectShadcn";
 import { Table } from "@/components/ui/Table";
-import { ArrowLeft, Package } from "lucide-react";
+import { Package } from "lucide-react";
+import { BackButton } from "@/components/shared/BackButton";
 import {
   getInventorySummary,
   getInventoryItems,
@@ -59,7 +61,16 @@ export default function StockOverviewPage() {
   }, [filters]);
 
   const columns = [
-    { key: "item_name", header: "Item" },
+    {
+      key: "item_name",
+      header: "Item",
+      render: (row: InventorySummary) => (
+        <span className="flex items-center gap-2 font-medium text-gray-900">
+          <Package className="h-4 w-4 text-gray-500" />
+          {row.item_name}
+        </span>
+      ),
+    },
     { key: "sku", header: "SKU" },
     { key: "warehouse_name", header: "Warehouse" },
     { key: "unit", header: "Unit" },
@@ -91,12 +102,7 @@ export default function StockOverviewPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/inventory">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
-          </Link>
+          <BackButton href="/inventory" label="Back" />
           <h1 className="text-2xl font-bold text-gray-900">Stock Overview</h1>
         </div>
         <div className="flex gap-2">
@@ -109,62 +115,66 @@ export default function StockOverviewPage() {
         </div>
       </div>
 
-      <div className="mb-4 flex gap-4">
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-gray-700">
-            Filter by Item
-          </label>
-          <SelectShadcn
-            value={filters.item_id}
-            onValueChange={(value) =>
-              setFilters((prev) => ({ ...prev, item_id: value }))
-            }
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="All Items" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">All Items</SelectItem>
-              {items.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </SelectShadcn>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-gray-700">
-            Filter by Warehouse
-          </label>
-          <SelectShadcn
-            value={filters.warehouse_id}
-            onValueChange={(value) =>
-              setFilters((prev) => ({ ...prev, warehouse_id: value }))
-            }
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="All Warehouses" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">All Warehouses</SelectItem>
-              {warehouses.map((wh) => (
-                <SelectItem key={wh.value} value={wh.value}>
-                  {wh.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </SelectShadcn>
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="flex items-center justify-center py-8">
-          <Package className="h-8 w-8 animate-spin text-gray-400" />
-        </div>
-      ) : (
-        <Table columns={columns} data={stock} />
-      )}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle>Current Stock</CardTitle>
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-600">Item:</span>
+                <SelectShadcn
+                  value={filters.item_id}
+                  onValueChange={(value) =>
+                    setFilters((prev) => ({ ...prev, item_id: value }))
+                  }
+                >
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="All Items" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All Items</SelectItem>
+                    {items.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </SelectShadcn>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-600">Warehouse:</span>
+                <SelectShadcn
+                  value={filters.warehouse_id}
+                  onValueChange={(value) =>
+                    setFilters((prev) => ({ ...prev, warehouse_id: value }))
+                  }
+                >
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="All Warehouses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All Warehouses</SelectItem>
+                    {warehouses.map((wh) => (
+                      <SelectItem key={wh.value} value={wh.value}>
+                        {wh.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </SelectShadcn>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Package className="h-8 w-8 animate-spin text-gray-400" />
+            </div>
+          ) : (
+            <Table columns={columns} data={stock} />
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
