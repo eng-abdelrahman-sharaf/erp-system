@@ -25,6 +25,13 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+button,
+button[type="button"],
+button[type="submit"],
+button[type="reset"] {
+  cursor: pointer;
+}
+
 @keyframes shimmer {
   100% {
     transform: translateX(100%);

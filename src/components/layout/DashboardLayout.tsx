@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { Sidebar } from "./Sidebar";
-import { Header } from "./Header";
+import { BoxesLinked, Loader2 } from "lucide-react";
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -8,24 +8,21 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       <Suspense fallback={<SidebarFallback />}>
         <Sidebar />
       </Suspense>
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
-      </div>
+      <main className="flex-1 overflow-y-auto p-6">{children}</main>
     </div>
   );
 }
 
 function SidebarFallback() {
   return (
-    <aside className="w-64 border-r border-gray-200 bg-white">
+    <aside className="w-16 border-r border-gray-200 bg-white">
       <div className="flex h-full flex-col">
-        <div className="border-b border-gray-200 p-6">
-          <h1 className="text-xl font-bold text-gray-900">ERP System</h1>
+        <div className="flex h-16 items-center justify-start border-b border-gray-200 px-4">
+          <BoxesLinked className="h-6 w-6 flex-shrink-0 text-blue-600" />
         </div>
-        <nav className="flex-1 space-y-1 p-4">
-          <p className="text-sm text-gray-600">Loading...</p>
-        </nav>
+        <div className="flex-1 p-2 flex justify-center pt-6">
+          <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+        </div>
       </div>
     </aside>
   );

@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { User } from "lucide-react";
+import { User, Loader2 } from "lucide-react";
 
 export function Header() {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const supabase = createClient();
   const [userName, setUserName] = useState<string | null>(null);
 
@@ -32,7 +33,7 @@ export function Header() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    router.push("/login");
+    startTransition(() => router.push("/login"));
   };
 
   return (
@@ -45,8 +46,14 @@ export function Header() {
             <span>{userName}</span>
           </div>
         )}
-        <Button variant="ghost" size="sm" onClick={handleLogout}>
-          Logout
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleLogout}
+          disabled={isPending}
+        >
+          {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          {isPending ? "Logging out" : "Logout"}
         </Button>
       </div>
     </header>

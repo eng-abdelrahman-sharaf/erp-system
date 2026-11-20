@@ -1,6 +1,12 @@
 import { Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { DashboardFilters as DashboardFiltersForm } from "./DashboardFilters";
+import {
+  OrdersFilters,
+  InventoryFilters,
+  EmployeesFilters,
+  DashboardFilterProvider,
+  DashboardSection,
+} from "./DashboardFilters";
 import { OrderVolumeChart } from "@/components/charts/OrderVolumeChart";
 import { NumberTicket } from "@/components/ui/NumberTicket";
 import {
@@ -60,156 +66,168 @@ export default async function DashboardPage({
   ]);
 
   return (
-    <div>
+    <DashboardFilterProvider>
       <h1 className="mb-6 text-2xl font-bold text-gray-900">Dashboard</h1>
 
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <DashboardFiltersForm
+      {/* ── Orders ─────────────────────────────────────────── */}
+      <DashboardSection
+        sectionId="orders"
+        title="Orders"
+        filters={
+          <OrdersFilters
             startDate={params.startDate}
             endDate={params.endDate}
-            warehouseId={params.warehouseId}
-            employeeId={params.employeeId}
             orderStatus={params.orderStatus}
+          />
+        }
+      >
+        <div className="mb-6 grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+          <MetricCard
+            title="Total Orders"
+            value={metrics.orders.total}
+            icon={<ShoppingCart className="h-6 w-6" />}
+            color="blue"
+          />
+          <MetricCard
+            title="Pending"
+            value={metrics.orders.pending}
+            icon={<TrendingUp className="h-6 w-6" />}
+            color="yellow"
+          />
+          <MetricCard
+            title="In Progress"
+            value={metrics.orders.inProgress}
+            icon={<TrendingUp className="h-6 w-6" />}
+            color="blue"
+          />
+          <MetricCard
+            title="Paid"
+            value={metrics.orders.paid}
+            icon={<DollarSign className="h-6 w-6" />}
+            color="green"
+          />
+          <MetricCard
+            title="Cancelled"
+            value={metrics.orders.cancelled}
+            icon={<AlertTriangle className="h-6 w-6" />}
+            color="red"
+          />
+        </div>
+
+        {/* Order Volume Chart */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Order Volume Over Time</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Suspense
+              fallback={<div className="h-64 animate-pulse bg-gray-200" />}
+            >
+              <OrderVolumeChart data={orderVolumeData} />
+            </Suspense>
+          </CardContent>
+        </Card>
+      </DashboardSection>
+
+      {/* ── Inventory ──────────────────────────────────────── */}
+      <DashboardSection
+        sectionId="inventory"
+        title="Inventory"
+        filters={
+          <InventoryFilters
+            warehouseId={params.warehouseId}
             warehouses={warehouses}
+            lowStockThreshold={params.lowStockThreshold}
+          />
+        }
+      >
+        <div className="mb-6 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <MetricCard
+            title="Total Items"
+            value={metrics.inventory.totalItems}
+            icon={<Package className="h-6 w-6" />}
+            color="blue"
+          />
+          <MetricCard
+            title="Warehouses"
+            value={metrics.inventory.totalWarehouses}
+            icon={<Package className="h-6 w-6" />}
+            color="purple"
+          />
+          <MetricCard
+            title="Available Stock"
+            value={metrics.inventory.availableStock}
+            icon={<Package className="h-6 w-6" />}
+            color="green"
+            showDecimals
+          />
+          <MetricCard
+            title="Low Stock Items"
+            value={metrics.inventory.lowStockItems}
+            icon={<AlertTriangle className="h-6 w-6" />}
+            color="red"
+          />
+        </div>
+
+        <div className="mb-8 grid gap-6 md:grid-cols-2">
+          <MetricCard
+            title="Reserved Stock"
+            value={metrics.inventory.reservedStock}
+            icon={<Package className="h-6 w-6" />}
+            color="yellow"
+            showDecimals
+          />
+          <MetricCard
+            title="Used Stock"
+            value={metrics.inventory.usedStock}
+            icon={<Package className="h-6 w-6" />}
+            color="gray"
+            showDecimals
+          />
+        </div>
+      </DashboardSection>
+
+      {/* ── Employees & Payroll ────────────────────────────── */}
+      <DashboardSection
+        sectionId="employees"
+        title="Employees & Payroll"
+        filters={
+          <EmployeesFilters
+            employeeId={params.employeeId}
             employees={employees}
           />
-        </CardContent>
-      </Card>
-
-      {/* Order Metrics */}
-      <h2 className="mb-4 text-lg font-semibold text-gray-900">Orders</h2>
-      <div className="mb-6 grid gap-6 md:grid-cols-2 lg:grid-cols-5">
-        <MetricCard
-          title="Total Orders"
-          value={metrics.orders.total}
-          icon={<ShoppingCart className="h-6 w-6" />}
-          color="blue"
-        />
-        <MetricCard
-          title="Pending"
-          value={metrics.orders.pending}
-          icon={<TrendingUp className="h-6 w-6" />}
-          color="yellow"
-        />
-        <MetricCard
-          title="In Progress"
-          value={metrics.orders.inProgress}
-          icon={<TrendingUp className="h-6 w-6" />}
-          color="blue"
-        />
-        <MetricCard
-          title="Paid"
-          value={metrics.orders.paid}
-          icon={<DollarSign className="h-6 w-6" />}
-          color="green"
-        />
-        <MetricCard
-          title="Cancelled"
-          value={metrics.orders.cancelled}
-          icon={<AlertTriangle className="h-6 w-6" />}
-          color="red"
-        />
-      </div>
-
-      {/* Order Volume Chart */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Order Volume Over Time</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Suspense
-            fallback={<div className="h-64 animate-pulse bg-gray-200" />}
-          >
-            <OrderVolumeChart data={orderVolumeData} />
-          </Suspense>
-        </CardContent>
-      </Card>
-
-      {/* Inventory Metrics */}
-      <h2 className="mb-4 text-lg font-semibold text-gray-900">Inventory</h2>
-      <div className="mb-6 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard
-          title="Total Items"
-          value={metrics.inventory.totalItems}
-          icon={<Package className="h-6 w-6" />}
-          color="blue"
-        />
-        <MetricCard
-          title="Warehouses"
-          value={metrics.inventory.totalWarehouses}
-          icon={<Package className="h-6 w-6" />}
-          color="purple"
-        />
-        <MetricCard
-          title="Available Stock"
-          value={metrics.inventory.availableStock}
-          icon={<Package className="h-6 w-6" />}
-          color="green"
-          showDecimals
-        />
-        <MetricCard
-          title="Low Stock Items"
-          value={metrics.inventory.lowStockItems}
-          icon={<AlertTriangle className="h-6 w-6" />}
-          color="red"
-        />
-      </div>
-
-      <div className="mb-6 grid gap-6 md:grid-cols-2">
-        <MetricCard
-          title="Reserved Stock"
-          value={metrics.inventory.reservedStock}
-          icon={<Package className="h-6 w-6" />}
-          color="yellow"
-          showDecimals
-        />
-        <MetricCard
-          title="Used Stock"
-          value={metrics.inventory.usedStock}
-          icon={<Package className="h-6 w-6" />}
-          color="gray"
-          showDecimals
-        />
-      </div>
-
-      {/* Employee Metrics */}
-      <h2 className="mb-4 text-lg font-semibold text-gray-900">
-        Employees & Payroll
-      </h2>
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard
-          title="Total Employees"
-          value={metrics.employees.total}
-          icon={<Users className="h-6 w-6" />}
-          color="blue"
-        />
-        <MetricCard
-          title="Active Employees"
-          value={metrics.employees.active}
-          icon={<Users className="h-6 w-6" />}
-          color="green"
-        />
-        <MetricCard
-          title="Total Salary Payments"
-          value={metrics.employees.totalSalaryPayments}
-          icon={<DollarSign className="h-6 w-6" />}
-          color="green"
-          isCurrency
-        />
-        <MetricCard
-          title="Outstanding Payroll"
-          value={metrics.employees.outstandingPayroll}
-          icon={<DollarSign className="h-6 w-6" />}
-          color="yellow"
-          isCurrency
-        />
-      </div>
-    </div>
+        }
+      >
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <MetricCard
+            title="Total Employees"
+            value={metrics.employees.total}
+            icon={<Users className="h-6 w-6" />}
+            color="blue"
+          />
+          <MetricCard
+            title="Active Employees"
+            value={metrics.employees.active}
+            icon={<Users className="h-6 w-6" />}
+            color="green"
+          />
+          <MetricCard
+            title="Total Salary Payments"
+            value={metrics.employees.totalSalaryPayments}
+            icon={<DollarSign className="h-6 w-6" />}
+            color="green"
+            isCurrency
+          />
+          <MetricCard
+            title="Outstanding Payroll"
+            value={metrics.employees.outstandingPayroll}
+            icon={<DollarSign className="h-6 w-6" />}
+            color="yellow"
+            isCurrency
+          />
+        </div>
+      </DashboardSection>
+    </DashboardFilterProvider>
   );
 }
 
