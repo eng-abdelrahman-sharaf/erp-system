@@ -9,6 +9,7 @@ import { Package, Warehouse as WarehouseIcon } from "lucide-react";
 import { BackButton } from "@/components/shared/BackButton";
 import { EditButton } from "@/components/shared/NavigationActions";
 import { getWarehouse, getWarehouseStock } from "@/features/inventory/actions";
+import type { Warehouse, InventorySummary } from "@/features/inventory/types";
 
 function WarehouseDetailsContent() {
   const params = useParams();
