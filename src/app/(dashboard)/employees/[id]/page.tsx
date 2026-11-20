@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useTransition } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
@@ -33,6 +33,7 @@ import {
   Calendar,
   User as UserIcon,
   Briefcase,
+  Loader2,
 } from "lucide-react";
 import {
   getEmployeeById,
@@ -95,6 +96,8 @@ function EmployeeDetailsContent() {
   const params = useParams();
   const router = useRouter();
   const employeeId = params.id as string;
+  const [isNavigatingBack, setIsNavigatingBack] = useState(false);
+  const [navigatingOrderId, setNavigatingOrderId] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [employee, setEmployee] = useState<Employee | null>(null);
@@ -104,8 +107,16 @@ function EmployeeDetailsContent() {
   );
   const [salaryPayments, setSalaryPayments] = useState<SalaryPayment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [payrollLoading, setPayrollLoading] = useState(true);
+  const [paymentsLoading, setPaymentsLoading] = useState(true);
+  const [error, setErrorState] = useState("");
   const [deletePayrollId, setDeletePayrollId] = useState<string | null>(null);
+
+  const setError = (msg: string) => {
+    setErrorState(msg);
+    if (msg) toast.error(msg);
+  };
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -158,84 +169,134 @@ function EmployeeDetailsContent() {
   };
 
   const loadOrders = async () => {
-    const result = await getEmployeeOrders(employeeId);
-    if (result.success && result.data) setOrders(result.data as Order[]);
+    try {
+      const result = await getEmployeeOrders(employeeId);
+      if (result.success && result.data) setOrders(result.data as Order[]);
+    } finally {
+      setOrdersLoading(false);
+    }
   };
 
   const loadPayroll = async () => {
-    const summaryResult = await getPayrollSummary(employeeId);
-    if (summaryResult.success && summaryResult.data)
-      setPayrollSummary(summaryResult.data as PayrollSummaryItem[]);
+    try {
+      const summaryResult = await getPayrollSummary(employeeId);
+      if (summaryResult.success && summaryResult.data)
+        setPayrollSummary(summaryResult.data as PayrollSummaryItem[]);
+    } finally {
+      setPayrollLoading(false);
+    }
   };
 
   const loadPayments = async () => {
-    const result = await getEmployeeSalaryPayments(employeeId);
-    if (result.success && result.data)
-      setSalaryPayments(result.data as SalaryPayment[]);
+    try {
+      const result = await getEmployeeSalaryPayments(employeeId);
+      if (result.success && result.data)
+        setSalaryPayments(result.data as SalaryPayment[]);
+    } finally {
+      setPaymentsLoading(false);
+    }
   };
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      await loadEmployee();
+      await Promise.all([
+        loadEmployee(),
+        loadOrders(),
+        loadPayroll(),
+        loadPayments(),
+      ]);
       setLoading(false);
     };
     fetchData();
   }, [employeeId]);
 
-  useEffect(() => {
-    const fetchTabData = async () => {
-      if (activeTab === "orders") await loadOrders();
-      else if (activeTab === "payroll") await loadPayroll();
-      else if (activeTab === "payments") await loadPayments();
-    };
-    fetchTabData();
-  }, [activeTab]);
-
   const handleUpdateEmployee = async () => {
-    const result = await updateEmployee({
-      id: employeeId,
+    if (!employee) return;
+    const previousEmployee = employee;
+    const updatedEmployee: Employee = {
+      ...employee,
       full_name: editForm.full_name,
-      email: editForm.email || undefined,
-      phone: editForm.phone || undefined,
-      address: editForm.address || undefined,
-      position: editForm.position || undefined,
-      salary: parseFloat(editForm.salary),
+      email: editForm.email || null,
+      phone: editForm.phone || null,
+      address: editForm.address || null,
+      position: editForm.position || null,
+      salary: parseFloat(editForm.salary) || 0,
       employment_date:
         editForm.employment_date instanceof Date
           ? editForm.employment_date.toISOString().split("T")[0]
           : editForm.employment_date,
       status: editForm.status,
-      notes: editForm.notes || undefined,
+      notes: editForm.notes || null,
+    };
+
+    setEmployee(updatedEmployee);
+    setShowEditModal(false);
+
+    const result = await updateEmployee({
+      id: employeeId,
+      full_name: updatedEmployee.full_name,
+      email: updatedEmployee.email || undefined,
+      phone: updatedEmployee.phone || undefined,
+      address: updatedEmployee.address || undefined,
+      position: updatedEmployee.position || undefined,
+      salary: updatedEmployee.salary,
+      employment_date: updatedEmployee.employment_date,
+      status: updatedEmployee.status,
+      notes: updatedEmployee.notes || undefined,
     });
     if (result.success) {
-      setShowEditModal(false);
+      toast.success("Employee updated successfully");
       loadEmployee();
-    } else setError(result.error || "Failed to update employee");
+    } else {
+      setEmployee(previousEmployee);
+      setError(result.error || "Failed to update employee");
+    }
   };
 
   const handleCreatePayrollPeriod = async () => {
+    const previousSummary = payrollSummary;
+    const periodStart =
+      payrollForm.period_start instanceof Date
+        ? payrollForm.period_start.toISOString().split("T")[0]
+        : payrollForm.period_start;
+    const periodEnd =
+      payrollForm.period_end instanceof Date
+        ? payrollForm.period_end.toISOString().split("T")[0]
+        : payrollForm.period_end;
+    const salaryAmount = parseFloat(payrollForm.salary_amount) || 0;
+
+    const tempPeriod: PayrollSummaryItem = {
+      payroll_period_id: `temp-${Date.now()}`,
+      period_start: periodStart,
+      period_end: periodEnd,
+      salary_amount: salaryAmount,
+      total_paid: 0,
+      outstanding: salaryAmount,
+    };
+
+    // Optimistically add to payroll table immediately
+    setPayrollSummary((prev) => [tempPeriod, ...prev]);
+    setShowPayrollModal(false);
+    setPayrollForm({
+      period_start: new Date(),
+      period_end: new Date(),
+      salary_amount: "",
+    });
+
     const result = await createPayrollPeriod({
       employee_id: employeeId,
-      period_start:
-        payrollForm.period_start instanceof Date
-          ? payrollForm.period_start.toISOString().split("T")[0]
-          : payrollForm.period_start,
-      period_end:
-        payrollForm.period_end instanceof Date
-          ? payrollForm.period_end.toISOString().split("T")[0]
-          : payrollForm.period_end,
-      salary_amount: parseFloat(payrollForm.salary_amount),
+      period_start: periodStart,
+      period_end: periodEnd,
+      salary_amount: salaryAmount,
     });
     if (result.success) {
-      setShowPayrollModal(false);
-      setPayrollForm({
-        period_start: new Date(),
-        period_end: new Date(),
-        salary_amount: "",
-      });
+      toast.success("Payroll period created successfully");
       loadPayroll();
-    } else setError(result.error || "Failed to create payroll period");
+    } else {
+      setPayrollSummary(previousSummary);
+      setError(result.error || "Failed to create payroll period");
+    }
   };
 
   const handleDeletePayrollPeriod = async (periodId: string) => {
@@ -244,42 +305,86 @@ function EmployeeDetailsContent() {
 
   const confirmDeletePayroll = async () => {
     if (!deletePayrollId) return;
-    const result = await deletePayrollPeriod(deletePayrollId, employeeId);
+    const id = deletePayrollId;
+    const previousSummary = payrollSummary;
+
+    // Immediate optimistic deletion
+    setDeletePayrollId(null);
+    setPayrollSummary((prev) => prev.filter((p) => p.payroll_period_id !== id));
+
+    const result = await deletePayrollPeriod(id, employeeId);
     if (result.success) {
-      loadPayroll();
       toast.success("Payroll period deleted");
-      setDeletePayrollId(null);
+      loadPayroll();
     } else {
+      setPayrollSummary(previousSummary);
       setError(result.error || "Failed to delete");
-      setDeletePayrollId(null);
     }
   };
 
   const handleRecordPayment = async () => {
-    const result = await recordSalaryPayment({
-      payroll_period_id: paymentForm.payroll_period_id,
-      amount: parseFloat(paymentForm.amount),
-      payment_date:
-        paymentForm.payment_date instanceof Date
-          ? paymentForm.payment_date.toISOString().split("T")[0]
-          : paymentForm.payment_date,
+    const previousPayments = salaryPayments;
+    const previousSummary = payrollSummary;
+    const paymentAmount = parseFloat(paymentForm.amount) || 0;
+    const paymentDate =
+      paymentForm.payment_date instanceof Date
+        ? paymentForm.payment_date.toISOString().split("T")[0]
+        : paymentForm.payment_date;
+
+    const tempPayment: SalaryPayment = {
+      id: `temp-${Date.now()}`,
+      amount: paymentAmount,
+      payment_date: paymentDate,
       method: paymentForm.method,
-      reference_number: paymentForm.reference_number || undefined,
-      notes: paymentForm.notes || undefined,
+      reference_number: paymentForm.reference_number || null,
+      notes: paymentForm.notes || null,
+    };
+
+    // Optimistically add to payments table and update payroll summary table
+    setSalaryPayments((prev) => [tempPayment, ...prev]);
+    setPayrollSummary((prev) =>
+      prev.map((item) =>
+        item.payroll_period_id === paymentForm.payroll_period_id
+          ? {
+              ...item,
+              total_paid: item.total_paid + paymentAmount,
+              outstanding: Math.max(0, item.outstanding - paymentAmount),
+            }
+          : item,
+      ),
+    );
+
+    setShowPaymentModal(false);
+    const savedPeriodId = paymentForm.payroll_period_id;
+    const savedMethod = paymentForm.method;
+    const savedRef = paymentForm.reference_number;
+    const savedNotes = paymentForm.notes;
+    setPaymentForm({
+      payroll_period_id: "",
+      amount: "",
+      payment_date: new Date(),
+      method: "bank_transfer",
+      reference_number: "",
+      notes: "",
+    });
+
+    const result = await recordSalaryPayment({
+      payroll_period_id: savedPeriodId,
+      amount: paymentAmount,
+      payment_date: paymentDate,
+      method: savedMethod,
+      reference_number: savedRef || undefined,
+      notes: savedNotes || undefined,
     });
     if (result.success) {
-      setShowPaymentModal(false);
-      setPaymentForm({
-        payroll_period_id: "",
-        amount: "",
-        payment_date: new Date(),
-        method: "bank_transfer",
-        reference_number: "",
-        notes: "",
-      });
+      toast.success("Payment recorded successfully");
       loadPayroll();
       loadPayments();
-    } else setError(result.error || "Failed to record payment");
+    } else {
+      setSalaryPayments(previousPayments);
+      setPayrollSummary(previousSummary);
+      setError(result.error || "Failed to record payment");
+    }
   };
 
   if (loading)
@@ -299,9 +404,20 @@ function EmployeeDetailsContent() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => router.back()}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setIsNavigatingBack(true);
+              router.back();
+            }}
+            disabled={isNavigatingBack}
+          >
+            {isNavigatingBack ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <ArrowLeft className="mr-2 h-4 w-4" />
+            )}
+            {isNavigatingBack ? "Loading" : "Back"}
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
@@ -338,14 +454,15 @@ function EmployeeDetailsContent() {
               icon: Calendar,
             },
           ].map((tab) => (
-            <button
+            <Button
               key={tab.id}
+              variant="ghost"
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 border-b-2 px-1 py-2 text-sm font-medium transition-colors ${activeTab === tab.id ? "border-blue-600 text-blue-600" : "border-transparent text-gray-600 hover:text-gray-900"}`}
             >
               <tab.icon className="h-4 w-4" />
               {tab.label}
-            </button>
+            </Button>
           ))}
         </nav>
       </div>
@@ -420,7 +537,11 @@ function EmployeeDetailsContent() {
             <CardTitle>Assigned Orders</CardTitle>
           </CardHeader>
           <CardContent>
-            {orders.length === 0 ? (
+            {ordersLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              </div>
+            ) : orders.length === 0 ? (
               <p className="text-gray-600">No orders assigned</p>
             ) : (
               <div className="overflow-x-auto">
@@ -451,12 +572,20 @@ function EmployeeDetailsContent() {
                         className="border-b border-gray-100 hover:bg-gray-50"
                       >
                         <td className="px-4 py-3 text-sm text-gray-700">
-                          <button
-                            onClick={() => router.push(`/orders/${order.id}`)}
+                          <Button
+                            variant="ghost"
+                            onClick={() => {
+                              setNavigatingOrderId(order.id);
+                              router.push(`/orders/${order.id}`);
+                            }}
                             className="font-medium text-blue-600 hover:underline"
+                            disabled={navigatingOrderId === order.id}
                           >
+                            {navigatingOrderId === order.id ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : null}
                             {order.order_number}
-                          </button>
+                          </Button>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
                           {order.title}
@@ -496,7 +625,11 @@ function EmployeeDetailsContent() {
             </div>
           </CardHeader>
           <CardContent>
-            {payrollSummary.length === 0 ? (
+            {payrollLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              </div>
+            ) : payrollSummary.length === 0 ? (
               <p className="text-gray-600">No payroll periods</p>
             ) : (
               <div className="overflow-x-auto">
@@ -590,7 +723,11 @@ function EmployeeDetailsContent() {
             <CardTitle>Payment History</CardTitle>
           </CardHeader>
           <CardContent>
-            {salaryPayments.length === 0 ? (
+            {paymentsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              </div>
+            ) : salaryPayments.length === 0 ? (
               <p className="text-gray-600">No payments recorded</p>
             ) : (
               <div className="overflow-x-auto">
@@ -708,7 +845,7 @@ function EmployeeDetailsContent() {
                 />
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium text-gray-700">
-                    Employment Date
+                    Employment Date <span className="text-red-500">*</span>
                   </label>
                   <DatePicker
                     value={

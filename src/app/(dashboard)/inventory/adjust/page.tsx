@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/SelectShadcn";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import {
   adjustInventory,
   getInventoryItems,
@@ -22,6 +22,7 @@ import Link from "next/link";
 
 export default function StockAdjustPage() {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [formData, setFormData] = useState({
     item_id: "",
     warehouse_id: "",
@@ -87,7 +88,7 @@ export default function StockAdjustPage() {
         formData.notes || undefined,
       );
       toast.success("Stock adjusted successfully");
-      router.push("/inventory/stock");
+      startTransition(() => router.push("/inventory/stock"));
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to adjust stock",
@@ -101,9 +102,13 @@ export default function StockAdjustPage() {
     <div>
       <div className="mb-6 flex items-center gap-4">
         <Link href="/inventory/stock">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
+          <Button variant="ghost" size="sm" disabled={isPending}>
+            {isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <ArrowLeft className="mr-2 h-4 w-4" />
+            )}
+            {isPending ? "Loading" : "Back"}
           </Button>
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">Adjust Stock</h1>
@@ -217,8 +222,11 @@ export default function StockAdjustPage() {
             {loading ? "Processing..." : "Adjust Stock"}
           </Button>
           <Link href="/inventory/stock">
-            <Button type="button" variant="secondary">
-              Cancel
+            <Button type="button" variant="secondary" disabled={isPending}>
+              {isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              {isPending ? "Loading" : "Cancel"}
             </Button>
           </Link>
         </div>

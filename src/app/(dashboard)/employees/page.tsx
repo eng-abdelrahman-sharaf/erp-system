@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
@@ -24,7 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/AlertDialog";
-import { Plus, Edit, Trash2, User } from "lucide-react";
+import { Plus, Edit, Trash2, User, Loader2 } from "lucide-react";
 import {
   getEmployees,
   createEmployee,
@@ -48,8 +48,14 @@ export default function EmployeesPage() {
   const router = useRouter();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setErrorState] = useState("");
+  const [navigatingEmployeeId, setNavigatingEmployeeId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const setError = (msg: string) => {
+    setErrorState(msg);
+    if (msg) toast.error(msg);
+  };
 
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -72,9 +78,9 @@ export default function EmployeesPage() {
     notes: "",
   });
 
-  const loadData = async () => {
-    setLoading(true);
-    setError("");
+  const loadData = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    setErrorState("");
 
     const filters: { search?: string; status?: "active" | "inactive" } = {};
     if (searchQuery) filters.search = searchQuery;
@@ -87,37 +93,54 @@ export default function EmployeesPage() {
       setError(result.error || "Failed to load employees");
     }
 
-    setLoading(false);
+    if (showLoading) setLoading(false);
   };
 
   useEffect(() => {
-    const fetchData = async () => {
-      await loadData();
-    };
-    fetchData();
+    loadData(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, statusFilter]);
 
   const handleCreate = async () => {
-    const result = await createEmployee({
+    const previousEmployees = employees;
+    const tempEmployee: Employee = {
+      id: `temp-${Date.now()}`,
       full_name: form.full_name,
-      email: form.email || undefined,
-      phone: form.phone || undefined,
-      address: form.address || undefined,
-      position: form.position || undefined,
-      salary: parseFloat(form.salary),
+      email: form.email || null,
+      phone: form.phone || null,
+      position: form.position || null,
+      salary: parseFloat(form.salary) || 0,
       employment_date: form.employment_date
         ? form.employment_date.toISOString().split("T")[0]
-        : "",
+        : new Date().toISOString().split("T")[0],
       status: form.status,
-      notes: form.notes || undefined,
+      created_at: new Date().toISOString(),
+    };
+
+    // Optimistically add to table immediately
+    setEmployees((prev) => [tempEmployee, ...prev]);
+    setShowModal(false);
+    const savedAddress = form.address;
+    const savedNotes = form.notes;
+    resetForm();
+
+    const result = await createEmployee({
+      full_name: tempEmployee.full_name,
+      email: tempEmployee.email || undefined,
+      phone: tempEmployee.phone || undefined,
+      address: savedAddress || undefined,
+      position: tempEmployee.position || undefined,
+      salary: tempEmployee.salary,
+      employment_date: tempEmployee.employment_date,
+      status: tempEmployee.status,
+      notes: savedNotes || undefined,
     });
 
     if (result.success) {
-      setShowModal(false);
-      resetForm();
-      loadData();
+      toast.success("Employee created successfully");
+      loadData(false);
     } else {
+      setEmployees(previousEmployees);
       setError(result.error || "Failed to create employee");
     }
   };
@@ -125,27 +148,48 @@ export default function EmployeesPage() {
   const handleUpdate = async () => {
     if (!editingEmployee) return;
 
-    const result = await updateEmployee({
-      id: editingEmployee.id,
+    const previousEmployees = employees;
+    const updatedEmployee: Employee = {
+      ...editingEmployee,
       full_name: form.full_name,
-      email: form.email || undefined,
-      phone: form.phone || undefined,
-      address: form.address || undefined,
-      position: form.position || undefined,
-      salary: parseFloat(form.salary),
+      email: form.email || null,
+      phone: form.phone || null,
+      position: form.position || null,
+      salary: parseFloat(form.salary) || 0,
       employment_date: form.employment_date
         ? form.employment_date.toISOString().split("T")[0]
-        : "",
+        : editingEmployee.employment_date,
       status: form.status,
-      notes: form.notes || undefined,
+    };
+
+    // Optimistically update employee in table immediately
+    setEmployees((prev) =>
+      prev.map((e) => (e.id === editingEmployee.id ? updatedEmployee : e)),
+    );
+    setShowModal(false);
+    const savedAddress = form.address;
+    const savedNotes = form.notes;
+    setEditingEmployee(null);
+    resetForm();
+
+    const result = await updateEmployee({
+      id: updatedEmployee.id,
+      full_name: updatedEmployee.full_name,
+      email: updatedEmployee.email || undefined,
+      phone: updatedEmployee.phone || undefined,
+      address: savedAddress || undefined,
+      position: updatedEmployee.position || undefined,
+      salary: updatedEmployee.salary,
+      employment_date: updatedEmployee.employment_date,
+      status: updatedEmployee.status,
+      notes: savedNotes || undefined,
     });
 
     if (result.success) {
-      setShowModal(false);
-      setEditingEmployee(null);
-      resetForm();
-      loadData();
+      toast.success("Employee updated successfully");
+      loadData(false);
     } else {
+      setEmployees(previousEmployees);
       setError(result.error || "Failed to update employee");
     }
   };
@@ -156,14 +200,20 @@ export default function EmployeesPage() {
 
   const confirmDelete = async () => {
     if (!deleteId) return;
-    const result = await deleteEmployee(deleteId);
+    const id = deleteId;
+    const previousEmployees = employees;
+
+    // Immediate optimistic deletion
+    setDeleteId(null);
+    setEmployees((prev) => prev.filter((e) => e.id !== id));
+
+    const result = await deleteEmployee(id);
     if (result.success) {
-      loadData();
       toast.success("Employee deleted successfully");
-      setDeleteId(null);
+      loadData(false);
     } else {
+      setEmployees(previousEmployees);
       setError(result.error || "Failed to delete employee");
-      setDeleteId(null);
     }
   };
 
@@ -291,15 +341,22 @@ export default function EmployeesPage() {
                       className="border-b border-gray-100 hover:bg-gray-50"
                     >
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        <button
-                          onClick={() =>
-                            router.push(`/employees/${employee.id}`)
-                          }
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            setNavigatingEmployeeId(employee.id);
+                            router.push(`/employees/${employee.id}`);
+                          }}
                           className="flex items-center gap-2 font-medium text-blue-600 hover:underline"
+                          disabled={navigatingEmployeeId === employee.id}
                         >
-                          <User className="h-4 w-4" />
+                          {navigatingEmployeeId === employee.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <User className="h-4 w-4" />
+                          )}
                           {employee.full_name}
-                        </button>
+                        </Button>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
                         {employee.email || "-"}

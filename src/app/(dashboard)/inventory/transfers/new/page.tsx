@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/SelectShadcn";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import {
   transferInventory,
   getInventoryItems,
@@ -22,6 +22,7 @@ import Link from "next/link";
 
 export default function NewTransferPage() {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [formData, setFormData] = useState({
     item_id: "",
     source_warehouse_id: "",
@@ -57,9 +58,11 @@ export default function NewTransferPage() {
   }, []);
 
   function handleChange(
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >,
+    e:
+      | React.ChangeEvent<
+          HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+        >
+      | { target: { name: string; value: string } },
   ) {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -98,7 +101,7 @@ export default function NewTransferPage() {
         formData.notes || undefined,
       );
       toast.success("Transfer completed successfully");
-      router.push("/inventory/transfers");
+      startTransition(() => router.push("/inventory/transfers"));
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to transfer inventory",
@@ -112,9 +115,13 @@ export default function NewTransferPage() {
     <div>
       <div className="mb-6 flex items-center gap-4">
         <Link href="/inventory/transfers">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
+          <Button variant="ghost" size="sm" disabled={isPending}>
+            {isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <ArrowLeft className="mr-2 h-4 w-4" />
+            )}
+            {isPending ? "Loading" : "Back"}
           </Button>
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">New Transfer</h1>
@@ -247,8 +254,11 @@ export default function NewTransferPage() {
             {loading ? "Processing..." : "Transfer"}
           </Button>
           <Link href="/inventory/transfers">
-            <Button type="button" variant="secondary">
-              Cancel
+            <Button type="button" variant="secondary" disabled={isPending}>
+              {isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              {isPending ? "Loading" : "Cancel"}
             </Button>
           </Link>
         </div>

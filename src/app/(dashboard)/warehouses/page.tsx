@@ -44,16 +44,23 @@ export default function WarehousesPage() {
 
   async function confirmDelete() {
     if (!deleteId) return;
+    const id = deleteId;
+    const prevWarehouses = warehouses;
+
+    // Immediate UI update
+    setDeleteId(null);
+    setWarehouses((prev) => prev.filter((w) => w.id !== id));
+
     try {
-      await deleteWarehouse(deleteId);
-      loadWarehouses();
+      await deleteWarehouse(id);
       toast.success("Warehouse deleted successfully");
-      setDeleteId(null);
+      const data = await getWarehouses(search);
+      setWarehouses(data);
     } catch (error) {
+      setWarehouses(prevWarehouses);
       toast.error(
         error instanceof Error ? error.message : "Failed to delete warehouse",
       );
-      setDeleteId(null);
     }
   }
 

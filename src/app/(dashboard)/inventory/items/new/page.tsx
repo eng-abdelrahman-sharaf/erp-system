@@ -1,17 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { createInventoryItem } from "@/features/inventory/actions";
 import Link from "next/link";
 import { InventoryItemCreateSchema } from "@/lib/validations";
 
 export default function NewInventoryItemPage() {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [formData, setFormData] = useState({
     name: "",
     sku: "",
@@ -51,7 +52,7 @@ export default function NewInventoryItemPage() {
     try {
       await createInventoryItem(formData);
       toast.success("Inventory item created successfully");
-      router.push("/inventory");
+      startTransition(() => router.push("/inventory"));
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to create item",
@@ -65,9 +66,13 @@ export default function NewInventoryItemPage() {
     <div>
       <div className="mb-6 flex items-center gap-4">
         <Link href="/inventory">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
+          <Button variant="ghost" size="sm" disabled={isPending}>
+            {isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <ArrowLeft className="mr-2 h-4 w-4" />
+            )}
+            {isPending ? "Loading" : "Back"}
           </Button>
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">New Inventory Item</h1>
@@ -120,8 +125,11 @@ export default function NewInventoryItemPage() {
             {loading ? "Creating..." : "Create Item"}
           </Button>
           <Link href="/inventory">
-            <Button type="button" variant="secondary">
-              Cancel
+            <Button type="button" variant="secondary" disabled={isPending}>
+              {isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              {isPending ? "Loading" : "Cancel"}
             </Button>
           </Link>
         </div>

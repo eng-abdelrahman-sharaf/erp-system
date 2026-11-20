@@ -17,8 +17,7 @@ export async function getInventoryItems(search?: string, sortBy?: string) {
 
   let query = supabase
     .from("inventory_items")
-    .select("*")
-    .order("created_at", { ascending: false });
+    .select("*");
 
   if (search) {
     query = query.or(`name.ilike.%${search}%,sku.ilike.%${search}%`);
@@ -31,7 +30,11 @@ export async function getInventoryItems(search?: string, sortBy?: string) {
       query = query.order(field as "name" | "sku" | "created_at", {
         ascending: direction === "asc",
       });
+    } else {
+      query = query.order("created_at", { ascending: false });
     }
+  } else {
+    query = query.order("created_at", { ascending: false });
   }
 
   const { data, error } = await query;
@@ -308,7 +311,10 @@ export async function adjustInventory(
 
   const { data, error } = await supabase.rpc(
     "adjust_inventory",
-    validationResult.data,
+    {
+      ...validationResult.data,
+      p_notes: validationResult.data.p_notes ?? undefined,
+    },
   );
 
   if (error) {
@@ -345,7 +351,10 @@ export async function transferInventory(
 
   const { data, error } = await supabase.rpc(
     "transfer_inventory",
-    validationResult.data,
+    {
+      ...validationResult.data,
+      p_notes: validationResult.data.p_notes ?? undefined,
+    },
   );
 
   if (error) {

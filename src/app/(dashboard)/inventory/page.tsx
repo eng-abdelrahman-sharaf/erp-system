@@ -55,16 +55,23 @@ export default function InventoryPage() {
 
   async function confirmDelete() {
     if (!deleteId) return;
+    const id = deleteId;
+    const prevItems = items;
+
+    // Immediate UI update
+    setDeleteId(null);
+    setItems((prev) => prev.filter((item) => item.id !== id));
+
     try {
-      await deleteInventoryItem(deleteId);
-      loadItems();
+      await deleteInventoryItem(id);
       toast.success("Item deleted successfully");
-      setDeleteId(null);
+      const data = await getInventoryItems(search, sortBy);
+      setItems(data);
     } catch (error) {
+      setItems(prevItems);
       toast.error(
         error instanceof Error ? error.message : "Failed to delete item",
       );
-      setDeleteId(null);
     }
   }
 

@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/SelectShadcn";
 import { Table } from "@/components/ui/Table";
-import { Package } from "lucide-react";
+import { ArrowLeft, Package } from "lucide-react";
 import {
   getInventorySummary,
   getInventoryItems,
@@ -90,7 +90,15 @@ export default function StockOverviewPage() {
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Stock Overview</h1>
+        <div className="flex items-center gap-4">
+          <Link href="/inventory">
+            <Button variant="ghost" size="sm">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+          </Link>
+          <h1 className="text-2xl font-bold text-gray-900">Stock Overview</h1>
+        </div>
         <div className="flex gap-2">
           <Link href="/inventory/adjust">
             <Button>Adjust Stock</Button>

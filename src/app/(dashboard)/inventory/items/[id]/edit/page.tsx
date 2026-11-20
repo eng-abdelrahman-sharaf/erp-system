@@ -1,11 +1,11 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useTransition } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import {
   getInventoryItem,
   updateInventoryItem,
@@ -16,6 +16,7 @@ function EditInventoryItemContent() {
   const router = useRouter();
   const params = useParams();
   const itemId = params.id as string;
+  const [isPending, startTransition] = useTransition();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -40,11 +41,11 @@ function EditInventoryItemContent() {
           });
         } else {
           toast.error("Item not found");
-          router.push("/inventory");
+          startTransition(() => router.push("/inventory"));
         }
       } catch {
         toast.error("Failed to load item");
-        router.push("/inventory");
+        startTransition(() => router.push("/inventory"));
       } finally {
         setLoading(false);
       }
@@ -80,7 +81,7 @@ function EditInventoryItemContent() {
     try {
       await updateInventoryItem(itemId, formData);
       toast.success("Item updated successfully");
-      router.push(`/inventory/items/${itemId}`);
+      startTransition(() => router.push(`/inventory/items/${itemId}`));
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to update item",
@@ -98,9 +99,13 @@ function EditInventoryItemContent() {
     <div>
       <div className="mb-6 flex items-center gap-4">
         <Link href={`/inventory/items/${itemId}`}>
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
+          <Button variant="ghost" size="sm" disabled={isPending}>
+            {isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <ArrowLeft className="mr-2 h-4 w-4" />
+            )}
+            {isPending ? "Loading" : "Back"}
           </Button>
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">
@@ -155,8 +160,11 @@ function EditInventoryItemContent() {
             {saving ? "Saving..." : "Save Changes"}
           </Button>
           <Link href={`/inventory/items/${itemId}`}>
-            <Button type="button" variant="secondary">
-              Cancel
+            <Button type="button" variant="secondary" disabled={isPending}>
+              {isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              {isPending ? "Loading" : "Cancel"}
             </Button>
           </Link>
         </div>
