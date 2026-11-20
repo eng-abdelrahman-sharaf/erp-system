@@ -1,16 +1,16 @@
 "use client";
 
-import { Suspense, useState, useTransition } from "react";
+import { Suspense, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useAppRouter } from "@/hooks/useAppRouter";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 
 function LoginContent() {
-  const router = useRouter();
+  const router = useAppRouter();
   const searchParams = useSearchParams();
-  const [isPending, startTransition] = useTransition();
   const supabase = createClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,10 +39,8 @@ function LoginContent() {
       return;
     }
 
-    startTransition(() => {
-      router.push("/dashboard");
-      router.refresh();
-    });
+    router.push("/dashboard");
+    router.refresh();
   };
 
   return (
@@ -75,9 +73,9 @@ function LoginContent() {
             <Button
               type="submit"
               className="w-full"
-              disabled={loading || isPending}
+              disabled={loading || router.isNavigating}
             >
-              {loading || isPending ? "Signing in..." : "Sign In"}
+              {loading || router.isNavigating ? "Signing in..." : "Sign In"}
             </Button>
           </form>
         </CardContent>

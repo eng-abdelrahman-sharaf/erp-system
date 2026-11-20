@@ -2,7 +2,7 @@
 
 import { useState, useTransition, createContext, useContext } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { DatePicker } from "@/components/ui/DatePicker";
+import { DatePicker, formatDateToYYYYMMDD, parseDateSafe } from "@/components/ui/DatePicker";
 import {
   Select as SelectShadcn,
   SelectContent,
@@ -146,8 +146,8 @@ export function OrdersFilters({
 }: OrdersFiltersProps) {
   const { apply } = useFilterNav("orders");
 
-  const startDateValue = startDate ? new Date(startDate) : undefined;
-  const endDateValue = endDate ? new Date(endDate) : undefined;
+  const startDateValue = parseDateSafe(startDate);
+  const endDateValue = parseDateSafe(endDate);
 
   return (
     <div className="mb-4 flex flex-wrap items-end gap-3">
@@ -156,7 +156,7 @@ export function OrdersFilters({
         <DatePicker
           value={startDateValue}
           onChange={(date) => {
-            apply({ startDate: date ? date.toISOString() : undefined });
+            apply({ startDate: date ? formatDateToYYYYMMDD(date) : undefined });
           }}
           placeholder="Start date"
           className="w-44"
@@ -168,7 +168,7 @@ export function OrdersFilters({
         <DatePicker
           value={endDateValue}
           onChange={(date) => {
-            apply({ endDate: date ? date.toISOString() : undefined });
+            apply({ endDate: date ? formatDateToYYYYMMDD(date) : undefined });
           }}
           placeholder="End date"
           className="w-44"
