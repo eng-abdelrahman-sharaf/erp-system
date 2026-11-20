@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useAppRouter } from "@/hooks/useAppRouter";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { DatePicker } from "@/components/ui/DatePicker";
+import { DatePicker, formatDateToYYYYMMDD, parseDateSafe } from "@/components/ui/DatePicker";
 import {
   Select as SelectShadcn,
   SelectContent,
@@ -45,12 +45,14 @@ interface Employee {
 }
 
 export default function EmployeesPage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setErrorState] = useState("");
-  const [navigatingEmployeeId, setNavigatingEmployeeId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const isNavigatingEmployee = (id: string) =>
+    router.isNavigatingTarget(`employee-${id}`);
 
   const setError = (msg: string) => {
     setErrorState(msg);
@@ -111,8 +113,8 @@ export default function EmployeesPage() {
       position: form.position || null,
       salary: parseFloat(form.salary) || 0,
       employment_date: form.employment_date
-        ? form.employment_date.toISOString().split("T")[0]
-        : new Date().toISOString().split("T")[0],
+        ? formatDateToYYYYMMDD(form.employment_date)
+        : formatDateToYYYYMMDD(new Date()),
       status: form.status,
       created_at: new Date().toISOString(),
     };
@@ -157,7 +159,7 @@ export default function EmployeesPage() {
       position: form.position || null,
       salary: parseFloat(form.salary) || 0,
       employment_date: form.employment_date
-        ? form.employment_date.toISOString().split("T")[0]
+        ? formatDateToYYYYMMDD(form.employment_date)
         : editingEmployee.employment_date,
       status: form.status,
     };
@@ -226,7 +228,7 @@ export default function EmployeesPage() {
       address: "",
       position: employee.position || "",
       salary: employee.salary.toString(),
-      employment_date: new Date(employee.employment_date),
+      employment_date: parseDateSafe(employee.employment_date),
       status: employee.status,
       notes: "",
     });
@@ -254,12 +256,16 @@ export default function EmployeesPage() {
         <h1 className="text-2xl font-bold text-gray-900">Employees</h1>
         <Button
           onClick={() => {
-            resetForm();
-            setShowModal(true);
+            router.push("/employees/new", { target: "new" });
           }}
+          disabled={router.isNavigatingTarget("new")}
         >
-          <Plus className="mr-2 h-4 w-4" />
-          Add Employee
+          {router.isNavigatingTarget("new") ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Plus className="mr-2 h-4 w-4" />
+          )}
+          {router.isNavigatingTarget("new") ? "Loading" : "Add Employee"}
         </Button>
       </div>
 
@@ -344,13 +350,14 @@ export default function EmployeesPage() {
                         <Button
                           variant="ghost"
                           onClick={() => {
-                            setNavigatingEmployeeId(employee.id);
-                            router.push(`/employees/${employee.id}`);
+                            router.push(`/employees/${employee.id}`, {
+                              target: `employee-${employee.id}`,
+                            });
                           }}
                           className="flex items-center gap-2 font-medium text-blue-600 hover:underline"
-                          disabled={navigatingEmployeeId === employee.id}
+                          disabled={isNavigatingEmployee(employee.id)}
                         >
-                          {navigatingEmployeeId === employee.id ? (
+                          {isNavigatingEmployee(employee.id) ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
                             <User className="h-4 w-4" />

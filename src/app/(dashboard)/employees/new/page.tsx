@@ -1,0 +1,251 @@
+"use client";
+
+import { Suspense, useState } from "react";
+import { useAppRouter } from "@/hooks/useAppRouter";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/Button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import {
+  Select as SelectShadcn,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/SelectShadcn";
+import { DatePicker, formatDateToYYYYMMDD } from "@/components/ui/DatePicker";
+import { Loader2 } from "lucide-react";
+import { BackButton } from "@/components/shared/BackButton";
+import { createEmployee } from "@/app/actions/employees";
+
+function NewEmployeeContent() {
+  const router = useAppRouter();
+  const [loading, setLoading] = useState(false);
+  const [error, setErrorState] = useState("");
+
+  const [form, setForm] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    address: "",
+    position: "",
+    salary: "",
+    employment_date: new Date() as Date | undefined,
+    status: "active" as "active" | "inactive",
+    notes: "",
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.full_name.trim()) {
+      setErrorState("Full name is required");
+      return;
+    }
+    const salaryNum = parseFloat(form.salary);
+    if (isNaN(salaryNum) || salaryNum < 0) {
+      setErrorState("Please enter a valid salary");
+      return;
+    }
+    if (!form.employment_date) {
+      setErrorState("Employment date is required");
+      return;
+    }
+
+    setLoading(true);
+    setErrorState("");
+
+    try {
+      const result = await createEmployee({
+        full_name: form.full_name.trim(),
+        email: form.email.trim() || undefined,
+        phone: form.phone.trim() || undefined,
+        address: form.address.trim() || undefined,
+        position: form.position.trim() || undefined,
+        salary: salaryNum,
+        employment_date: formatDateToYYYYMMDD(form.employment_date),
+        status: form.status,
+        notes: form.notes.trim() || undefined,
+      });
+
+      if (result.success) {
+        toast.success("Employee created successfully");
+        router.push("/employees");
+      } else {
+        setErrorState(result.error || "Failed to create employee");
+        setLoading(false);
+      }
+    } catch (err) {
+      setErrorState(
+        err instanceof Error ? err.message : "Failed to create employee"
+      );
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="mb-6 flex items-center gap-4">
+        <BackButton href="/employees" label="Back" />
+        <h1 className="text-2xl font-bold text-gray-900">Create New Employee</h1>
+      </div>
+
+      {error && (
+        <div className="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Employee Information</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Input
+                label="Full Name"
+                value={form.full_name}
+                onChange={(e) =>
+                  setForm({ ...form, full_name: e.target.value })
+                }
+                placeholder="e.g. John Doe"
+                required
+              />
+              <Input
+                label="Email"
+                type="email"
+                value={form.email}
+                onChange={(e) =>
+                  setForm({ ...form, email: e.target.value })
+                }
+                placeholder="john@example.com"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Input
+                label="Phone"
+                value={form.phone}
+                onChange={(e) =>
+                  setForm({ ...form, phone: e.target.value })
+                }
+                placeholder="+1 (555) 000-0000"
+              />
+              <Input
+                label="Position"
+                value={form.position}
+                onChange={(e) =>
+                  setForm({ ...form, position: e.target.value })
+                }
+                placeholder="e.g. Warehouse Manager"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Input
+                label="Salary ($)"
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.salary}
+                onChange={(e) =>
+                  setForm({ ...form, salary: e.target.value })
+                }
+                placeholder="0.00"
+                required
+              />
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-gray-700">
+                  Employment Date <span className="text-red-500">*</span>
+                </label>
+                <DatePicker
+                  value={form.employment_date}
+                  onChange={(date) =>
+                    setForm({ ...form, employment_date: date })
+                  }
+                  placeholder="Select employment date"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-gray-700">
+                  Status
+                </label>
+                <SelectShadcn
+                  value={form.status}
+                  onValueChange={(value) =>
+                    setForm({
+                      ...form,
+                      status: value as "active" | "inactive",
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </SelectShadcn>
+              </div>
+              <Input
+                label="Address"
+                value={form.address}
+                onChange={(e) =>
+                  setForm({ ...form, address: e.target.value })
+                }
+                placeholder="e.g. 123 Main St, City"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-gray-700">Notes</label>
+              <textarea
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                rows={3}
+                placeholder="Additional notes about employee..."
+                className="flex min-h-20 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => router.push("/employees", { target: "cancel" })}
+                disabled={loading || router.isNavigatingTarget("cancel")}
+              >
+                {router.isNavigatingTarget("cancel") ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                {router.isNavigatingTarget("cancel") ? "Loading" : "Cancel"}
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create Employee"
+                )}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+export default function NewEmployeePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <NewEmployeeContent />
+    </Suspense>
+  );
+}

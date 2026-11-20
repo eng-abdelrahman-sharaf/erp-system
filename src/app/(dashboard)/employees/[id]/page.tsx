@@ -1,7 +1,9 @@
 "use client";
 
-import { Suspense, useState, useEffect, useTransition } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useState, useEffect } from "react";
+import { useParams } from "next/navigation";
+import { useAppRouter } from "@/hooks/useAppRouter";
+import { BackButton } from "@/components/shared/BackButton";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -13,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/SelectShadcn";
-import { DatePicker } from "@/components/ui/DatePicker";
+import { DatePicker, formatDateToYYYYMMDD, parseDateSafe } from "@/components/ui/DatePicker";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +36,7 @@ import {
   User as UserIcon,
   Briefcase,
   Loader2,
+  ShoppingCart,
 } from "lucide-react";
 import {
   getEmployeeById,
@@ -94,10 +97,11 @@ type TabType = "overview" | "orders" | "payroll" | "payments";
 
 function EmployeeDetailsContent() {
   const params = useParams();
-  const router = useRouter();
+  const router = useAppRouter();
   const employeeId = params.id as string;
-  const [isNavigatingBack, setIsNavigatingBack] = useState(false);
-  const [navigatingOrderId, setNavigatingOrderId] = useState<string | null>(null);
+
+  const isNavigatingOrder = (id: string) =>
+    router.isNavigatingTarget(`order-${id}`);
 
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [employee, setEmployee] = useState<Employee | null>(null);
@@ -159,7 +163,7 @@ function EmployeeDetailsContent() {
         address: result.data.address || "",
         position: result.data.position || "",
         salary: result.data.salary.toString(),
-        employment_date: new Date(result.data.employment_date),
+        employment_date: parseDateSafe(result.data.employment_date) || new Date(),
         status: result.data.status,
         notes: result.data.notes || "",
       });
@@ -222,10 +226,7 @@ function EmployeeDetailsContent() {
       address: editForm.address || null,
       position: editForm.position || null,
       salary: parseFloat(editForm.salary) || 0,
-      employment_date:
-        editForm.employment_date instanceof Date
-          ? editForm.employment_date.toISOString().split("T")[0]
-          : editForm.employment_date,
+      employment_date: formatDateToYYYYMMDD(editForm.employment_date),
       status: editForm.status,
       notes: editForm.notes || null,
     };
@@ -256,14 +257,8 @@ function EmployeeDetailsContent() {
 
   const handleCreatePayrollPeriod = async () => {
     const previousSummary = payrollSummary;
-    const periodStart =
-      payrollForm.period_start instanceof Date
-        ? payrollForm.period_start.toISOString().split("T")[0]
-        : payrollForm.period_start;
-    const periodEnd =
-      payrollForm.period_end instanceof Date
-        ? payrollForm.period_end.toISOString().split("T")[0]
-        : payrollForm.period_end;
+    const periodStart = formatDateToYYYYMMDD(payrollForm.period_start);
+    const periodEnd = formatDateToYYYYMMDD(payrollForm.period_end);
     const salaryAmount = parseFloat(payrollForm.salary_amount) || 0;
 
     const tempPeriod: PayrollSummaryItem = {
@@ -326,10 +321,7 @@ function EmployeeDetailsContent() {
     const previousPayments = salaryPayments;
     const previousSummary = payrollSummary;
     const paymentAmount = parseFloat(paymentForm.amount) || 0;
-    const paymentDate =
-      paymentForm.payment_date instanceof Date
-        ? paymentForm.payment_date.toISOString().split("T")[0]
-        : paymentForm.payment_date;
+    const paymentDate = formatDateToYYYYMMDD(paymentForm.payment_date);
 
     const tempPayment: SalaryPayment = {
       id: `temp-${Date.now()}`,
@@ -404,21 +396,7 @@ function EmployeeDetailsContent() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setIsNavigatingBack(true);
-              router.back();
-            }}
-            disabled={isNavigatingBack}
-          >
-            {isNavigatingBack ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <ArrowLeft className="mr-2 h-4 w-4" />
-            )}
-            {isNavigatingBack ? "Loading" : "Back"}
-          </Button>
+          <BackButton label="Back" />
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
               {employee.full_name}
@@ -575,15 +553,18 @@ function EmployeeDetailsContent() {
                           <Button
                             variant="ghost"
                             onClick={() => {
-                              setNavigatingOrderId(order.id);
-                              router.push(`/orders/${order.id}`);
+                              router.push(`/orders/${order.id}`, {
+                                target: `order-${order.id}`,
+                              });
                             }}
-                            className="font-medium text-blue-600 hover:underline"
-                            disabled={navigatingOrderId === order.id}
+                            className="flex items-center font-medium text-blue-600 hover:underline"
+                            disabled={isNavigatingOrder(order.id)}
                           >
-                            {navigatingOrderId === order.id ? (
+                            {isNavigatingOrder(order.id) ? (
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : null}
+                            ) : (
+                              <ShoppingCart className="mr-2 h-4 w-4" />
+                            )}
                             {order.order_number}
                           </Button>
                         </td>
