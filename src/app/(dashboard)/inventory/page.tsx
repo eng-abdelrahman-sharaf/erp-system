@@ -80,6 +80,18 @@ export default function InventoryPage() {
     { key: "sku", header: "SKU" },
     { key: "unit", header: "Unit" },
     {
+      key: "created_at",
+      header: "Date Added",
+      render: (row: InventoryItem) =>
+        row.created_at
+          ? new Date(row.created_at).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })
+          : "-",
+    },
+    {
       key: "description",
       header: "Description",
       render: (row: InventoryItem) => row.description || "-",

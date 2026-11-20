@@ -26,15 +26,22 @@ export async function getInventoryItems(search?: string, sortBy?: string) {
   if (sortBy) {
     const [field, direction] = sortBy.split("-");
     const validFields = ["name", "sku", "created_at"] as const;
+    const isAsc = direction === "asc";
     if (validFields.includes(field as (typeof validFields)[number])) {
-      query = query.order(field as "name" | "sku" | "created_at", {
-        ascending: direction === "asc",
-      });
+      query = query
+        .order(field as "name" | "sku" | "created_at", {
+          ascending: isAsc,
+        })
+        .order("id", { ascending: isAsc });
     } else {
-      query = query.order("created_at", { ascending: false });
+      query = query
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false });
     }
   } else {
-    query = query.order("created_at", { ascending: false });
+    query = query
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false });
   }
 
   const { data, error } = await query;

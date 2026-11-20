@@ -11,6 +11,7 @@ interface TableProps<T> extends HTMLAttributes<HTMLTableElement> {
   columns?: Column<T>[];
   data?: T[];
   className?: string;
+  rowKey?: (row: T, index: number) => string | number;
 }
 
 export function Table<T>({
@@ -18,6 +19,7 @@ export function Table<T>({
   data,
   className,
   children,
+  rowKey,
   ...props
 }: TableProps<T>) {
   // If columns and data are provided, use the structured table
@@ -38,25 +40,31 @@ export function Table<T>({
             </tr>
           </thead>
           <tbody>
-            {data.map((row, index) => (
-              <tr
-                key={index}
-                className="border-b border-gray-100 hover:bg-gray-50"
-              >
-                {columns.map((column) => (
-                  <td
-                    key={column.key}
-                    className="px-4 py-3 text-sm text-gray-700"
-                  >
-                    {column.render
-                      ? column.render(row)
-                      : String(
-                          (row as Record<string, unknown>)[column.key] ?? "",
-                        )}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {data.map((row, index) => {
+              const key = rowKey
+                ? rowKey(row, index)
+                : ((row as Record<string, unknown>).id as string | number) ??
+                  index;
+              return (
+                <tr
+                  key={key}
+                  className="border-b border-gray-100 hover:bg-gray-50"
+                >
+                  {columns.map((column) => (
+                    <td
+                      key={column.key}
+                      className="px-4 py-3 text-sm text-gray-700"
+                    >
+                      {column.render
+                        ? column.render(row)
+                        : String(
+                            (row as Record<string, unknown>)[column.key] ?? "",
+                          )}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
             {data.length === 0 && (
               <tr>
                 <td
