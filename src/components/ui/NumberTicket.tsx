@@ -70,7 +70,6 @@ export function NumberTicket({
         className,
       )}
     >
-      <div className="absolute inset-0 bg-linear-to-r from-transparent via-black/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite] dark:via-white/10" />
       <span className="relative text-3xl font-bold tracking-tight">
         {formatValue}
       </span>
