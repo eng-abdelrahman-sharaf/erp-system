@@ -62,12 +62,12 @@ const navigation = [
     icon: UserCog,
     module: "users" as const,
   },
-  {
-    name: "Reports",
-    href: "/reports",
-    icon: FileText,
-    module: null as null,
-  },
+  // {
+  //   name: "Reports",
+  //   href: "/reports",
+  //   icon: FileText,
+  //   module: null as null,
+  // },
 ];
 
 export function Sidebar() {
