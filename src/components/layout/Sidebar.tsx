@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { useAppRouter } from "@/hooks/useAppRouter";
 import { createClient } from "@/lib/supabase/client";
 import { getCurrentUserProfile } from "@/app/actions/users";
 import {
@@ -71,8 +72,7 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const router = useAppRouter();
   const { hasPermission, loading } = usePermissions();
   const [isHovered, setIsHovered] = useState(false);
   const [userName, setUserName] = useState<string>("");
@@ -80,7 +80,7 @@ export function Sidebar() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    startTransition(() => router.push("/login"));
+    router.push("/login", { target: "logout" });
   };
 
   useEffect(() => {
@@ -188,19 +188,20 @@ export function Sidebar() {
             variant="ghost"
             onClick={handleLogout}
             className={cn("w-full justify-start gap-3")}
-            disabled={isPending}
+            disabled={router.isNavigatingTarget("logout")}
           >
-            <LogOut className="h-5 w-5 flex-shrink-0" />
+            {router.isNavigatingTarget("logout") ? (
+              <Loader2 className="h-5 w-5 flex-shrink-0 animate-spin text-blue-600" />
+            ) : (
+              <LogOut className="h-5 w-5 flex-shrink-0" />
+            )}
             <span
               className={cn(
                 "transition-all duration-300 whitespace-nowrap",
                 isExpanded ? "opacity-100" : "opacity-0 w-0 overflow-hidden",
               )}
             >
-              {isPending ? (
-                <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-              ) : null}
-              {isPending ? "Logging out" : "Logout"}
+              {router.isNavigatingTarget("logout") ? "Logging out" : "Logout"}
             </span>
           </Button>
         </div>

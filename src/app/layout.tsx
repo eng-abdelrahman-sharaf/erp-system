@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
+import { NavigationProvider } from "@/components/providers/NavigationProvider";
+import { NavigationProgressBar } from "@/components/shared/NavigationProgressBar";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -25,7 +27,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full overflow-hidden antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        {children}
+        <NavigationProvider>
+          <NavigationProgressBar />
+          {children}
+        </NavigationProvider>
         <Toaster />
       </body>
     </html>
