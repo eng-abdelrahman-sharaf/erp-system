@@ -1,5 +1,5 @@
-export { OrdersReport } from './orders-report';
-export { InventoryReport } from './inventory-report';
-export { InventoryActivityReport } from './inventory-activity-report';
-export { EmployeeReport } from './employee-report';
-export { PayrollReport } from './payroll-report';
+export { OrdersReport } from "@/lib/reports/pdf/OrdersReport";
+export { InventoryReport } from "@/lib/reports/pdf/InventoryReport";
+export { InventoryActivityReport } from "@/lib/reports/pdf/InventoryActivityReport";
+export { EmployeeReport } from "@/lib/reports/pdf/EmployeeReport";
+export { PayrollReport } from "@/lib/reports/pdf/PayrollReport";

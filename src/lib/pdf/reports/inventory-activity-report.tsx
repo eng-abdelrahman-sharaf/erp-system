@@ -59,7 +59,6 @@ export const InventoryActivityReport = ({
             "Order #",
             "User",
             "Date",
-            "Notes",
           ]}
           rows={data.activities.map((activity) => [
             activity.activity_type,
@@ -69,9 +68,8 @@ export const InventoryActivityReport = ({
             activity.related_order_number || "N/A",
             activity.performed_by_name || "N/A",
             new Date(activity.created_at).toLocaleDateString(),
-            activity.notes || "",
           ])}
-          widths={[12, 18, 15, 8, 12, 15, 12, 8]}
+          widths={[14, 20, 18, 10, 13, 13, 12]}
         />
       </View>
 
