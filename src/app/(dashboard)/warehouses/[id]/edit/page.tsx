@@ -21,7 +21,6 @@ function EditWarehouseContent() {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     async function loadWarehouse() {
@@ -63,23 +62,27 @@ function EditWarehouseContent() {
     const newErrors: Record<string, string> = {};
 
     if (!formData.name.trim()) newErrors.name = "Name is required";
+    if (!formData.address.trim()) newErrors.address = "Address is required";
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
 
-    setSaving(true);
+    router.startNavigation("save");
     try {
-      await updateWarehouse(warehouseId, formData);
+      await updateWarehouse(warehouseId, {
+        name: formData.name.trim(),
+        address: formData.address.trim(),
+        description: formData.description ? formData.description.trim() : null,
+      });
       toast.success("Warehouse updated successfully");
       router.push(`/warehouses/${warehouseId}`);
     } catch (error) {
+      router.stopNavigation();
       toast.error(
         error instanceof Error ? error.message : "Failed to update warehouse",
       );
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -90,7 +93,7 @@ function EditWarehouseContent() {
   return (
     <div>
       <div className="mb-6 flex items-center gap-4">
-        <BackButton href={`/warehouses/${warehouseId}`} label="Back" />
+        <BackButton label="Back" />
         <h1 className="text-2xl font-bold text-gray-900">Edit Warehouse</h1>
       </div>
 
@@ -109,6 +112,8 @@ function EditWarehouseContent() {
           name="address"
           value={formData.address}
           onChange={handleChange}
+          error={errors.address}
+          required
         />
 
         <div className="flex flex-col gap-1.5">
@@ -125,8 +130,8 @@ function EditWarehouseContent() {
         </div>
 
         <div className="flex gap-4">
-          <Button type="submit" disabled={saving}>
-            {saving ? "Saving..." : "Save Changes"}
+          <Button type="submit" disabled={router.isNavigatingTarget("save")}>
+            {router.isNavigatingTarget("save") ? "Saving..." : "Save Changes"}
           </Button>
           <Button
             type="button"

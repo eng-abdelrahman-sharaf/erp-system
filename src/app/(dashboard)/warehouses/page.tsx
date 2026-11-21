@@ -21,24 +21,36 @@ import { ViewButton, EditButton } from "@/components/shared/NavigationActions";
 import { getWarehouses, deleteWarehouse } from "@/features/inventory/actions";
 import type { Warehouse } from "@/features/inventory/types";
 import Link from "next/link";
+import { Pagination } from "@/components/shared/Pagination";
+
+const PAGE_SIZE = 10;
 
 export default function WarehousesPage() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
-  async function loadWarehouses() {
+  async function loadWarehouses(pageNum = page) {
     setLoading(true);
-    const data = await getWarehouses(search);
-    setWarehouses(data);
+    const res = await getWarehouses(search, pageNum, PAGE_SIZE);
+    setWarehouses(res.data);
+    setTotal(res.total);
     setLoading(false);
   }
 
   useEffect(() => {
-    loadWarehouses();
+    setPage(1);
+    loadWarehouses(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
+
+  useEffect(() => {
+    loadWarehouses(page);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
   async function handleDelete(id: string) {
     setDeleteId(id);
@@ -56,8 +68,7 @@ export default function WarehousesPage() {
     try {
       await deleteWarehouse(id);
       toast.success("Warehouse deleted successfully");
-      const data = await getWarehouses(search);
-      setWarehouses(data);
+      await loadWarehouses(page);
     } catch (error) {
       setWarehouses(prevWarehouses);
       toast.error(
@@ -95,10 +106,7 @@ export default function WarehousesPage() {
       header: "Actions",
       render: (row: Warehouse) => (
         <div className="flex gap-2">
-          <ViewButton
-            href={`/warehouses/${row.id}`}
-            title="View Warehouse"
-          />
+          <ViewButton href={`/warehouses/${row.id}`} title="View Warehouse" />
           <EditButton
             href={`/warehouses/${row.id}/edit`}
             title="Edit Warehouse"
@@ -149,7 +157,15 @@ export default function WarehousesPage() {
               <WarehouseIcon className="h-8 w-8 animate-spin text-gray-400" />
             </div>
           ) : (
-            <Table columns={columns} data={warehouses} />
+            <>
+              <Table columns={columns} data={warehouses} />
+              <Pagination
+                page={page}
+                pageSize={PAGE_SIZE}
+                total={total}
+                onPageChange={setPage}
+              />
+            </>
           )}
         </CardContent>
       </Card>

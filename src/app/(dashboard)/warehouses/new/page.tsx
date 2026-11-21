@@ -17,7 +17,6 @@ export default function NewWarehousePage() {
     description: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(false);
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -45,24 +44,23 @@ export default function NewWarehousePage() {
       return;
     }
 
-    setLoading(true);
+    router.startNavigation("create");
     try {
       await createWarehouse(formData);
       toast.success("Warehouse created successfully");
       router.push("/warehouses");
     } catch (error) {
+      router.stopNavigation();
       toast.error(
         error instanceof Error ? error.message : "Failed to create warehouse",
       );
-    } finally {
-      setLoading(false);
     }
   }
 
   return (
     <div>
       <div className="mb-6 flex items-center gap-4">
-        <BackButton href="/warehouses" label="Back" />
+        <BackButton label="Back" />
         <h1 className="text-2xl font-bold text-gray-900">New Warehouse</h1>
       </div>
 
@@ -81,6 +79,8 @@ export default function NewWarehousePage() {
           name="address"
           value={formData.address}
           onChange={handleChange}
+          error={errors.address}
+          required
         />
 
         <div className="flex flex-col gap-1.5">
@@ -97,8 +97,8 @@ export default function NewWarehousePage() {
         </div>
 
         <div className="flex gap-4">
-          <Button type="submit" disabled={loading}>
-            {loading ? "Creating..." : "Create Warehouse"}
+          <Button type="submit" disabled={router.isNavigatingTarget("create")}>
+            {router.isNavigatingTarget("create") ? "Creating..." : "Create Warehouse"}
           </Button>
           <Button
             type="button"
