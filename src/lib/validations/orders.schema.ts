@@ -22,10 +22,13 @@ export const OrderSchema = z.object({
     .max(255, "Client name must be at most 255 characters"),
   client_phone: z
     .string()
+    .min(1, "Client phone is required")
     .max(50, "Client phone must be at most 50 characters")
-    .nullable()
-    .optional(),
-  client_address: z.string().nullable().optional(),
+    .refine((val) => val.trim().length > 0, "Client phone is required"),
+  client_address: z
+    .string()
+    .min(1, "Client address is required")
+    .refine((val) => val.trim().length > 0, "Client address is required"),
   employee_id: z.string().uuid("Invalid employee ID").nullable().optional(),
   status: OrderStatusEnum.default("pending"),
   order_date: z
@@ -33,7 +36,7 @@ export const OrderSchema = z.object({
     .refine((val) => !isNaN(Date.parse(val)), "Invalid order date")
     .default(new Date().toISOString().split("T")[0]),
   notes: z.string().nullable().optional(),
-  created_by: z.string().uuid().nullable().optional(),
+  created_by: z.string().uuid("Invalid user ID"),
   created_at: z.string().datetime().optional(),
   updated_at: z.string().datetime().optional(),
 });

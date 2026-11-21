@@ -10,13 +10,16 @@ import type {
   OrderActivityLogWithProfile,
 } from "./types";
 import { revalidatePath } from "next/cache";
+import { formatDatabaseError } from "@/lib/utils/errors";
 
 export async function getOrders(filters?: {
   search?: string;
   status?: "pending" | "in_progress" | "paid" | "cancelled";
   employee_id?: string;
   sortBy?: string;
-}) {
+  page?: number;
+  pageSize?: number;
+}): Promise<any> {
   const supabase = await createClient();
 
   let query = supabase
@@ -27,6 +30,7 @@ export async function getOrders(filters?: {
       employees (id, full_name),
       order_inventory (id)
     `,
+      { count: "exact" },
     );
 
   if (filters?.search) {
@@ -71,6 +75,21 @@ export async function getOrders(filters?: {
       .order("id", { ascending: false });
   }
 
+  if (filters?.page !== undefined && filters?.pageSize !== undefined) {
+    const from = (filters.page - 1) * filters.pageSize;
+    const to = from + filters.pageSize - 1;
+    query = query.range(from, to);
+
+    const { data, count, error } = await query;
+
+    if (error) {
+      console.error("Error fetching orders:", error);
+      return { data: [], total: 0 };
+    }
+
+    return { data: (data || []) as OrderWithEmployee[], total: count || 0 };
+  }
+
   const { data, error } = await query;
 
   if (error) {
@@ -106,15 +125,36 @@ export async function getOrder(id: string) {
 export async function createOrder(order: OrderInput) {
   const supabase = await createClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const createdBy = order.created_by || user?.id;
+  if (!createdBy) {
+    throw new Error("User not authenticated or created_by not provided");
+  }
+
+  if (!order.client_phone || !order.client_phone.trim()) {
+    throw new Error("Client phone is required");
+  }
+  if (!order.client_address || !order.client_address.trim()) {
+    throw new Error("Client address is required");
+  }
+
   const { data, error } = await supabase
     .from("orders")
-    .insert(order)
+    .insert({
+      ...order,
+      client_phone: order.client_phone.trim(),
+      client_address: order.client_address.trim(),
+      created_by: createdBy,
+    })
     .select()
     .single();
 
   if (error) {
     console.error("Error creating order:", error);
-    throw error;
+    throw new Error(formatDatabaseError(error));
   }
 
   revalidatePath("/orders");
@@ -147,18 +187,35 @@ export async function updateOrderStatus(
 }
 
 export async function updateOrder(id: string, order: Partial<OrderInput>) {
+  if (order.client_phone !== undefined && !order.client_phone.trim()) {
+    throw new Error("Client phone cannot be empty");
+  }
+  if (order.client_address !== undefined && !order.client_address.trim()) {
+    throw new Error("Client address cannot be empty");
+  }
+
   const supabase = await createClient();
+
+  const updateData = {
+    ...order,
+    ...(order.client_phone !== undefined && {
+      client_phone: order.client_phone.trim(),
+    }),
+    ...(order.client_address !== undefined && {
+      client_address: order.client_address.trim(),
+    }),
+  };
 
   const { data, error } = await supabase
     .from("orders")
-    .update(order)
+    .update(updateData)
     .eq("id", id)
     .select()
     .single();
 
   if (error) {
     console.error("Error updating order:", error);
-    throw error;
+    throw new Error(formatDatabaseError(error));
   }
 
   revalidatePath("/orders");

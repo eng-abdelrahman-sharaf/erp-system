@@ -30,7 +30,6 @@ function EditOrderContent() {
   const orderId = params.id as string;
 
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setErrorState] = useState("");
 
   const setError = (msg: string) => {
@@ -87,36 +86,37 @@ function EditOrderContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
     setError("");
 
     if (
-      !form.order_number ||
-      !form.title ||
-      !form.client_name ||
+      !form.order_number.trim() ||
+      !form.title.trim() ||
+      !form.client_name.trim() ||
+      !form.client_phone.trim() ||
+      !form.client_address.trim() ||
       !form.order_date
     ) {
       setError("Please fill in all required fields");
-      setSaving(false);
       return;
     }
 
+    router.startNavigation("save");
     try {
       await updateOrder(orderId, {
-        order_number: form.order_number,
-        title: form.title,
-        description: form.description || null,
-        client_name: form.client_name,
-        client_phone: form.client_phone || null,
-        client_address: form.client_address || null,
+        order_number: form.order_number.trim(),
+        title: form.title.trim(),
+        description: form.description ? form.description.trim() : null,
+        client_name: form.client_name.trim(),
+        client_phone: form.client_phone.trim(),
+        client_address: form.client_address.trim(),
         employee_id: form.employee_id || null,
         order_date: formatDateToYYYYMMDD(form.order_date),
-        notes: form.notes || null,
+        notes: form.notes ? form.notes.trim() : null,
       });
       router.push(`/orders/${orderId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update order");
-      setSaving(false);
+      router.stopNavigation();
     }
   };
 
@@ -133,7 +133,7 @@ function EditOrderContent() {
     return (
       <div>
         <div className="mb-6 flex items-center gap-4">
-          <BackButton href={`/orders/${orderId}`} />
+          <BackButton />
           <h1 className="text-2xl font-bold text-gray-900">Edit Order</h1>
         </div>
         <Card>
@@ -151,7 +151,7 @@ function EditOrderContent() {
   return (
     <div>
       <div className="mb-6 flex items-center gap-4">
-        <BackButton href={`/orders/${orderId}`} />
+        <BackButton />
         <h1 className="text-2xl font-bold text-gray-900">Edit Order</h1>
       </div>
 
@@ -198,19 +198,21 @@ function EditOrderContent() {
                 required
               />
               <Input
-                label="Client Phone"
+                label="Client Phone *"
                 value={form.client_phone}
                 onChange={(e) =>
                   setForm({ ...form, client_phone: e.target.value })
                 }
+                required
               />
             </div>
             <Input
-              label="Client Address"
+              label="Client Address *"
               value={form.client_address}
               onChange={(e) =>
                 setForm({ ...form, client_address: e.target.value })
               }
+              required
             />
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="flex flex-col gap-1.5">
@@ -272,15 +274,15 @@ function EditOrderContent() {
                 onClick={() =>
                   router.push(`/orders/${orderId}`, { target: "cancel" })
                 }
-                disabled={saving || router.isNavigatingTarget("cancel")}
+                disabled={router.isNavigatingTarget("save") || router.isNavigatingTarget("cancel")}
               >
                 {router.isNavigatingTarget("cancel") ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
                 {router.isNavigatingTarget("cancel") ? "Loading" : "Cancel"}
               </Button>
-              <Button type="submit" disabled={saving}>
-                {saving ? "Saving..." : "Save Changes"}
+              <Button type="submit" disabled={router.isNavigatingTarget("save")}>
+                {router.isNavigatingTarget("save") ? "Saving..." : "Save Changes"}
               </Button>
             </div>
           </form>

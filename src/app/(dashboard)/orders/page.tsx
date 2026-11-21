@@ -27,11 +27,16 @@ import { Plus, Edit, Trash2, ShoppingCart, Loader2, Eye } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { getOrders, deleteOrder } from "@/features/orders/actions";
 import type { OrderWithEmployee } from "@/features/orders/types";
+import { Pagination } from "@/components/shared/Pagination";
+
+const PAGE_SIZE = 8;
 
 export default function OrdersPage() {
   const router = useAppRouter();
   const [orders, setOrders] = useState<OrderWithEmployee[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
 
   const isAddingOrder = router.isNavigatingTarget("new");
   const isNavigatingOrder = (id: string) =>
@@ -52,21 +57,27 @@ export default function OrdersPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
 
-  const loadData = async (showLoading = true) => {
+  const loadData = async (pageNum = page, showLoading = true) => {
     if (showLoading) setLoading(true);
 
     const filters: {
       search?: string;
       status?: "pending" | "in_progress" | "paid" | "cancelled";
       sortBy?: string;
-    } = {};
+      page?: number;
+      pageSize?: number;
+    } = {
+      page: pageNum,
+      pageSize: PAGE_SIZE,
+    };
     if (searchQuery) filters.search = searchQuery;
     if (statusFilter !== "all") filters.status = statusFilter;
     filters.sortBy = sortBy;
 
     try {
-      const data = await getOrders(filters);
-      setOrders(data);
+      const res = await getOrders(filters);
+      setOrders(res.data || []);
+      setTotal(res.total || 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load orders");
     } finally {
@@ -75,9 +86,15 @@ export default function OrdersPage() {
   };
 
   useEffect(() => {
-    loadData(true);
+    setPage(1);
+    loadData(1, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, statusFilter, sortBy]);
+
+  useEffect(() => {
+    loadData(page, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
   const handleDelete = async (orderId: string) => {
     setOrderToDelete(orderId);
@@ -97,7 +114,7 @@ export default function OrdersPage() {
     try {
       await deleteOrder(id);
       toast.success("Order deleted successfully");
-      loadData(false);
+      loadData(page, false);
     } catch (err) {
       // Revert on error
       setOrders(previousOrders);
@@ -217,6 +234,7 @@ export default function OrdersPage() {
           ) : orders.length === 0 ? (
             <p className="text-gray-600">No orders found</p>
           ) : (
+            <>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
@@ -379,6 +397,13 @@ export default function OrdersPage() {
                 </tbody>
               </table>
             </div>
+            <Pagination
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={total}
+              onPageChange={setPage}
+            />
+            </>
           )}
         </CardContent>
       </Card>

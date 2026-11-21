@@ -4,13 +4,13 @@ export interface Order {
   title: string;
   description: string | null;
   client_name: string;
-  client_phone: string | null;
-  client_address: string | null;
+  client_phone: string;
+  client_address: string;
   employee_id: string | null;
   status: "pending" | "in_progress" | "paid" | "cancelled";
   order_date: string;
   notes: string | null;
-  created_by: string | null;
+  created_by: string;
   created_at: string;
   updated_at: string;
 }
@@ -18,7 +18,9 @@ export interface Order {
 export type OrderInput = Omit<
   Order,
   "id" | "created_at" | "updated_at" | "created_by"
->;
+> & {
+  created_by?: string;
+};
 
 export interface OrderWithEmployee extends Order {
   employees: {
