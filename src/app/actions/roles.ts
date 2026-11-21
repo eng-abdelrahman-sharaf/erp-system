@@ -11,6 +11,7 @@ import {
   RoleUpdateSchema,
   RolePermissionSchema,
 } from "@/lib/validations";
+import { formatDatabaseError } from "@/lib/utils/errors";
 
 export type CreateRoleInput = Omit<
   z.infer<typeof RoleSchema>,
@@ -53,7 +54,7 @@ export async function createRole(input: CreateRoleInput) {
     });
 
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     revalidatePath("/users");
@@ -108,7 +109,7 @@ export async function updateRole(input: UpdateRoleInput) {
       .eq("id", validationResult.data.id);
 
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     revalidatePath("/users");
@@ -161,7 +162,7 @@ export async function deleteRole(roleId: string) {
     const { error } = await supabase.from("roles").delete().eq("id", roleId);
 
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     revalidatePath("/users");
@@ -278,7 +279,10 @@ export async function updateRolePermissions(input: UpdatePermissionsInput) {
 /**
  * Get all roles with their permissions
  */
-export async function getRoles() {
+export async function getRoles(pagination?: {
+  page?: number;
+  pageSize?: number;
+}) {
   const canRead = await hasPermission("users", "read");
   if (!canRead) {
     return { error: "Insufficient permissions to view roles" };
@@ -286,7 +290,7 @@ export async function getRoles() {
 
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase
+    let query = supabase
       .from("roles")
       .select(
         `
@@ -300,11 +304,28 @@ export async function getRoles() {
           can_write
         )
       `,
+        { count: "exact" },
       )
       .order("created_at", { ascending: false });
 
+    if (pagination?.page !== undefined && pagination?.pageSize !== undefined) {
+      const from = (pagination.page - 1) * pagination.pageSize;
+      const to = from + pagination.pageSize - 1;
+      query = query.range(from, to);
+
+      const { data, count, error } = await query;
+
+      if (error) {
+        return { error: formatDatabaseError(error) };
+      }
+
+      return { success: true, data: data || [], total: count || 0 };
+    }
+
+    const { data, error } = await query;
+
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     return { success: true, data };
@@ -344,7 +365,7 @@ export async function getRoleById(roleId: string) {
       .single();
 
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     return { success: true, data };

@@ -32,7 +32,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/AlertDialog";
-import { Plus, Edit, Trash2, Shield, UserRoundX, UserRoundCheck } from "lucide-react";
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Shield,
+  UserRoundX,
+  UserRoundCheck,
+} from "lucide-react";
 import {
   getUsers,
   createUser,
@@ -49,6 +56,9 @@ import {
 } from "@/app/actions/roles";
 import { ModuleName } from "@/lib/permissions/permissions";
 import { RoleSchema, ProfileCreateSchema } from "@/lib/validations";
+import { Pagination } from "@/components/shared/Pagination";
+
+const PAGE_SIZE = 10;
 
 interface User {
   id: string;
@@ -78,11 +88,18 @@ export default function UsersPage() {
   const [activeTab, setActiveTab] = useState<"users" | "roles">("users");
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [allRoles, setAllRoles] = useState<Role[]>([]);
+  const [usersTotal, setUsersTotal] = useState(0);
+  const [rolesTotal, setRolesTotal] = useState(0);
+  const [usersPage, setUsersPage] = useState(1);
+  const [rolesPage, setRolesPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [deleteRoleId, setDeleteRoleId] = useState<string | null>(null);
-  const [deactivateUserTarget, setDeactivateUserTarget] = useState<User | null>(null);
+  const [deactivateUserTarget, setDeactivateUserTarget] = useState<User | null>(
+    null,
+  );
 
   // User modal state
   const [showUserModal, setShowUserModal] = useState(false);
@@ -110,34 +127,75 @@ export default function UsersPage() {
     inventory: { can_read: false, can_write: false },
   });
 
-  const loadData = async (showLoading = true) => {
+  const loadUsers = async (showLoading = true, pageNum = usersPage) => {
     if (showLoading) setLoading(true);
     setErrors({});
 
-    // Always load roles since they're needed for the user creation dropdown
-    const rolesResult = await getRoles();
-    if (rolesResult.success && rolesResult.data) {
-      setRoles(rolesResult.data as Role[]);
-    } else {
-      setErrors({ general: rolesResult.error || "Failed to load roles" });
+    const [rolesResult, usersResult] = await Promise.all([
+      allRoles.length === 0 ? getRoles() : Promise.resolve(null),
+      getUsers({ page: pageNum, pageSize: PAGE_SIZE }),
+    ]);
+
+    if (rolesResult && rolesResult.success && rolesResult.data) {
+      setAllRoles(rolesResult.data as Role[]);
     }
 
-    // Load users only when on the users tab
-    if (activeTab === "users") {
-      const result = await getUsers();
-      if (result.success && result.data) {
-        setUsers(result.data as User[]);
-      } else {
-        setErrors({ general: result.error || "Failed to load users" });
-      }
+    if (usersResult.success && usersResult.data) {
+      setUsers(usersResult.data as User[]);
+      setUsersTotal(usersResult.total || 0);
+    } else if (usersResult.error) {
+      setErrors((prev) => ({
+        ...prev,
+        general: usersResult.error || "Failed to load users",
+      }));
     }
 
     if (showLoading) setLoading(false);
   };
 
+  const loadRoles = async (showLoading = true, pageNum = rolesPage) => {
+    if (showLoading) setLoading(true);
+    setErrors({});
+
+    const rolesResult = await getRoles({ page: pageNum, pageSize: PAGE_SIZE });
+    if (rolesResult.success && rolesResult.data) {
+      setRoles(rolesResult.data as Role[]);
+      setRolesTotal(rolesResult.total || 0);
+    } else {
+      setErrors((prev) => ({
+        ...prev,
+        general: rolesResult.error || "Failed to load roles",
+      }));
+    }
+
+    if (showLoading) setLoading(false);
+  };
+
+  const loadData = async (showLoading = true) => {
+    if (activeTab === "users") {
+      await loadUsers(showLoading, usersPage);
+    } else {
+      await loadRoles(showLoading, rolesPage);
+    }
+  };
+
   useEffect(() => {
-    const initialDataLoad = async () => loadData(true);
-    initialDataLoad();
+    if (activeTab === "users") {
+      loadUsers(true, usersPage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usersPage]);
+
+  useEffect(() => {
+    if (activeTab === "roles") {
+      loadRoles(true, rolesPage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rolesPage]);
+
+  useEffect(() => {
+    loadData(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   const handleCreateUser = async () => {
@@ -160,7 +218,8 @@ export default function UsersPage() {
     }
 
     const previousUsers = users;
-    const selectedRole = roles.find((r) => r.id === userForm.role_id);
+    const availableRoles = allRoles.length > 0 ? allRoles : roles;
+    const selectedRole = availableRoles.find((r) => r.id === userForm.role_id);
     const tempUser: User = {
       id: `temp-${Date.now()}`,
       full_name: userForm.full_name,
@@ -200,7 +259,8 @@ export default function UsersPage() {
     if (!editingUser) return;
 
     const previousUsers = users;
-    const selectedRole = roles.find((r) => r.id === userForm.role_id);
+    const availableRoles = allRoles.length > 0 ? allRoles : roles;
+    const selectedRole = availableRoles.find((r) => r.id === userForm.role_id);
     const updatedUser: User = {
       ...editingUser,
       full_name: userForm.full_name,
@@ -340,6 +400,7 @@ export default function UsersPage() {
 
     if (result.success) {
       toast.success("Role created successfully");
+      setAllRoles([]);
       loadData(false);
     } else {
       setRoles(previousRoles);
@@ -405,6 +466,7 @@ export default function UsersPage() {
 
       if (permResult.success) {
         toast.success("Role updated successfully");
+        setAllRoles([]);
         loadData(false);
       } else {
         setRoles(previousRoles);
@@ -432,6 +494,7 @@ export default function UsersPage() {
     const result = await deleteRole(id);
     if (result.success) {
       toast.success("Role deleted successfully");
+      setAllRoles([]);
       loadData(false);
     } else {
       setRoles(previousRoles);
@@ -548,79 +611,91 @@ export default function UsersPage() {
             {loading ? (
               <p className="text-gray-600">Loading...</p>
             ) : (
-              <Table
-                columns={[
-                  { key: "full_name", header: "Name" },
-                  { key: "email", header: "Email" },
-                  {
-                    key: "role",
-                    header: "Role",
-                    render: (row: User) => row.roles.name,
-                  },
-                  {
-                    key: "status",
-                    header: "Status",
-                    render: (row: User) => (
-                      <span
-                        className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                          row.status === "active"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {row.status}
-                      </span>
-                    ),
-                  },
-                  {
-                    key: "created_at",
-                    header: "Created",
-                    render: (row: User) =>
-                      new Date(row.created_at).toLocaleDateString(),
-                  },
-                  {
-                    key: "actions",
-                    header: "Actions",
-                    render: (row: User) => (
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEditUser(row)}
+              <>
+                <Table
+                  columns={[
+                    { key: "full_name", header: "Name" },
+                    { key: "email", header: "Email" },
+                    {
+                      key: "role",
+                      header: "Role",
+                      render: (row: User) => row.roles.name,
+                    },
+                    {
+                      key: "status",
+                      header: "Status",
+                      render: (row: User) => (
+                        <span
+                          className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                            row.status === "active"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}
                         >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            if (row.status === "active") {
-                              setDeactivateUserTarget(row);
-                            } else {
-                              handleToggleUserStatus(row.id, row.status);
+                          {row.status}
+                        </span>
+                      ),
+                    },
+                    {
+                      key: "created_at",
+                      header: "Created",
+                      render: (row: User) =>
+                        new Date(row.created_at).toLocaleDateString(),
+                    },
+                    {
+                      key: "actions",
+                      header: "Actions",
+                      render: (row: User) => (
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditUser(row)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              if (row.status === "active") {
+                                setDeactivateUserTarget(row);
+                              } else {
+                                handleToggleUserStatus(row.id, row.status);
+                              }
+                            }}
+                            title={
+                              row.status === "active"
+                                ? "Deactivate user"
+                                : "Activate user"
                             }
-                          }}
-                          title={row.status === "active" ? "Deactivate user" : "Activate user"}
-                        >
-                          {row.status === "active" ? (
-                            <UserRoundX className="h-4 w-4 text-red-500" />
-                          ) : (
-                            <UserRoundCheck className="h-4 w-4 text-green-600" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteUser(row.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ),
-                  },
-                ]}
-                data={users}
-              />
+                          >
+                            {row.status === "active" ? (
+                              <UserRoundX className="h-4 w-4 text-red-500" />
+                            ) : (
+                              <UserRoundCheck className="h-4 w-4 text-green-600" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteUser(row.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ),
+                    },
+                  ]}
+                  data={users}
+                />
+                <Pagination
+                  page={usersPage}
+                  pageSize={PAGE_SIZE}
+                  total={usersTotal}
+                  onPageChange={setUsersPage}
+                />
+              </>
             )}
           </CardContent>
         </Card>
@@ -645,64 +720,72 @@ export default function UsersPage() {
             {loading ? (
               <p className="text-gray-600">Loading...</p>
             ) : (
-              <Table
-                columns={[
-                  { key: "name", header: "Name" },
-                  {
-                    key: "description",
-                    header: "Description",
-                    render: (row: Role) => row.description || "-",
-                  },
-                  {
-                    key: "permissions",
-                    header: "Permissions",
-                    render: (row: Role) => (
-                      <div className="flex flex-wrap gap-1">
-                        {row.role_permissions.map((p) => (
-                          <span
-                            key={p.module}
-                            className="inline-flex rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800"
-                          >
-                            {p.module} ({p.can_read ? "R" : ""}
-                            {p.can_write ? "W" : ""})
-                          </span>
-                        ))}
-                      </div>
-                    ),
-                  },
-                  {
-                    key: "created_at",
-                    header: "Created",
-                    render: (row: Role) =>
-                      new Date(row.created_at).toLocaleDateString(),
-                  },
-                  {
-                    key: "actions",
-                    header: "Actions",
-                    render: (row: Role) => (
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEditRole(row)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        {row.name !== "Admin" && (
+              <>
+                <Table
+                  columns={[
+                    { key: "name", header: "Name" },
+                    {
+                      key: "description",
+                      header: "Description",
+                      render: (row: Role) => row.description || "-",
+                    },
+                    {
+                      key: "permissions",
+                      header: "Permissions",
+                      render: (row: Role) => (
+                        <div className="flex flex-wrap gap-1">
+                          {row.role_permissions.map((p) => (
+                            <span
+                              key={p.module}
+                              className="inline-flex rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800"
+                            >
+                              {p.module} ({p.can_read ? "R" : ""}
+                              {p.can_write ? "W" : ""})
+                            </span>
+                          ))}
+                        </div>
+                      ),
+                    },
+                    {
+                      key: "created_at",
+                      header: "Created",
+                      render: (row: Role) =>
+                        new Date(row.created_at).toLocaleDateString(),
+                    },
+                    {
+                      key: "actions",
+                      header: "Actions",
+                      render: (row: Role) => (
+                        <div className="flex gap-2">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDeleteRole(row.id)}
+                            onClick={() => openEditRole(row)}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Edit className="h-4 w-4" />
                           </Button>
-                        )}
-                      </div>
-                    ),
-                  },
-                ]}
-                data={roles}
-              />
+                          {row.name !== "Admin" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteRole(row.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ),
+                    },
+                  ]}
+                  data={roles}
+                />
+                <Pagination
+                  page={rolesPage}
+                  pageSize={PAGE_SIZE}
+                  total={rolesTotal}
+                  onPageChange={setRolesPage}
+                />
+              </>
             )}
           </CardContent>
         </Card>
@@ -762,7 +845,7 @@ export default function UsersPage() {
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
                 <SelectContent>
-                  {roles.map((role) => (
+                  {(allRoles.length > 0 ? allRoles : roles).map((role) => (
                     <SelectItem key={role.id} value={role.id}>
                       <div className="flex flex-col items-start">
                         <span>{role.name}</span>

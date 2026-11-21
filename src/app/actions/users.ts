@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { hasPermission } from "@/lib/permissions/permissions";
 import { ProfileUpdateSchema } from "@/lib/validations";
+import { formatDatabaseError } from "@/lib/utils/errors";
 
 // Initialize Supabase Admin client with service-role key
 // This should only be used in server actions, never exposed to the client
@@ -65,7 +66,7 @@ export async function createUser(input: CreateUserInput) {
     if (profileError) {
       // Rollback: delete the auth user if profile creation fails
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-      return { error: profileError.message };
+      return { error: formatDatabaseError(profileError) };
     }
 
     revalidatePath("/users");
@@ -111,7 +112,7 @@ export async function updateUser(input: UpdateUserInput) {
       .eq("id", validationResult.data.id);
 
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     revalidatePath("/users");
@@ -142,7 +143,7 @@ export async function setUserStatus(
       .eq("id", userId);
 
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     revalidatePath("/users");
@@ -168,7 +169,7 @@ export async function deleteUser(userId: string) {
     const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     revalidatePath("/users");
@@ -182,7 +183,10 @@ export async function deleteUser(userId: string) {
 /**
  * Get all users with their roles
  */
-export async function getUsers() {
+export async function getUsers(pagination?: {
+  page?: number;
+  pageSize?: number;
+}) {
   const canRead = await hasPermission("users", "read");
   if (!canRead) {
     return { error: "Insufficient permissions to view users" };
@@ -190,7 +194,7 @@ export async function getUsers() {
 
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase
+    let query = supabase
       .from("profiles")
       .select(
         `
@@ -204,11 +208,28 @@ export async function getUsers() {
           name
         )
       `,
+        { count: "exact" },
       )
       .order("created_at", { ascending: false });
 
+    if (pagination?.page !== undefined && pagination?.pageSize !== undefined) {
+      const from = (pagination.page - 1) * pagination.pageSize;
+      const to = from + pagination.pageSize - 1;
+      query = query.range(from, to);
+
+      const { data, count, error } = await query;
+
+      if (error) {
+        return { error: formatDatabaseError(error) };
+      }
+
+      return { success: true, data: data || [], total: count || 0 };
+    }
+
+    const { data, error } = await query;
+
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     return { success: true, data };
@@ -282,7 +303,7 @@ export async function getUserById(userId: string) {
       .single();
 
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     return { success: true, data };
