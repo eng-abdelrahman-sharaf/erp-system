@@ -3,13 +3,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { hasPermission } from "@/lib/permissions/permissions";
+import { formatDatabaseError } from "@/lib/utils/errors";
 
 export interface CreateEmployeeInput {
   full_name: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  position?: string;
+  email: string;
+  phone: string;
+  address: string;
+  position: string;
   salary: number;
   employment_date: string;
   status?: "active" | "inactive";
@@ -38,22 +39,42 @@ export async function createEmployee(input: CreateEmployeeInput) {
     return { error: "Insufficient permissions to create employees" };
   }
 
+  if (!input.full_name || !input.full_name.trim()) {
+    return { error: "Full name is required" };
+  }
+
+  if (!input.email || !input.email.trim()) {
+    return { error: "Email is required" };
+  }
+
+  if (!input.phone || !input.phone.trim()) {
+    return { error: "Phone number is required" };
+  }
+
+  if (!input.address || !input.address.trim()) {
+    return { error: "Address is required" };
+  }
+
+  if (!input.position || !input.position.trim()) {
+    return { error: "Position is required" };
+  }
+
   try {
     const supabase = await createClient();
     const { error } = await supabase.from("employees").insert({
-      full_name: input.full_name,
-      email: input.email || null,
-      phone: input.phone || null,
-      address: input.address || null,
-      position: input.position || null,
+      full_name: input.full_name.trim(),
+      email: input.email.trim(),
+      phone: input.phone.trim(),
+      address: input.address.trim(),
+      position: input.position.trim(),
       salary: input.salary,
       employment_date: input.employment_date,
       status: input.status || "active",
-      notes: input.notes || null,
+      notes: input.notes?.trim() || null,
     });
 
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     revalidatePath("/employees");
@@ -73,27 +94,49 @@ export async function updateEmployee(input: UpdateEmployeeInput) {
     return { error: "Insufficient permissions to update employees" };
   }
 
+  if (input.full_name !== undefined && !input.full_name.trim()) {
+    return { error: "Full name cannot be empty" };
+  }
+  if (input.email !== undefined && !input.email.trim()) {
+    return { error: "Email cannot be empty" };
+  }
+  if (input.phone !== undefined && !input.phone.trim()) {
+    return { error: "Phone number cannot be empty" };
+  }
+  if (input.address !== undefined && !input.address.trim()) {
+    return { error: "Address cannot be empty" };
+  }
+  if (input.position !== undefined && !input.position.trim()) {
+    return { error: "Position cannot be empty" };
+  }
+
   try {
     const supabase = await createClient();
     const { error } = await supabase
       .from("employees")
       .update({
-        ...(input.full_name !== undefined && { full_name: input.full_name }),
-        ...(input.email !== undefined && { email: input.email || null }),
-        ...(input.phone !== undefined && { phone: input.phone || null }),
-        ...(input.address !== undefined && { address: input.address || null }),
-        ...(input.position !== undefined && { position: input.position || null }),
+        ...(input.full_name !== undefined && {
+          full_name: input.full_name.trim(),
+        }),
+        ...(input.email !== undefined && { email: input.email.trim() }),
+        ...(input.phone !== undefined && { phone: input.phone.trim() }),
+        ...(input.address !== undefined && { address: input.address.trim() }),
+        ...(input.position !== undefined && {
+          position: input.position.trim(),
+        }),
         ...(input.salary !== undefined && { salary: input.salary }),
         ...(input.employment_date !== undefined && {
           employment_date: input.employment_date,
         }),
         ...(input.status !== undefined && { status: input.status }),
-        ...(input.notes !== undefined && { notes: input.notes || null }),
+        ...(input.notes !== undefined && {
+          notes: input.notes ? input.notes.trim() : null,
+        }),
       })
       .eq("id", input.id);
 
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     revalidatePath("/employees");
@@ -138,7 +181,7 @@ export async function deleteEmployee(employeeId: string) {
       .eq("id", employeeId);
 
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     revalidatePath("/employees");
@@ -155,6 +198,8 @@ export async function deleteEmployee(employeeId: string) {
 export async function getEmployees(filters?: {
   search?: string;
   status?: "active" | "inactive";
+  page?: number;
+  pageSize?: number;
 }) {
   const canRead = await hasPermission("employees", "read");
   if (!canRead) {
@@ -165,7 +210,7 @@ export async function getEmployees(filters?: {
     const supabase = await createClient();
     let query = supabase
       .from("employees")
-      .select("*")
+      .select("*", { count: "exact" })
       .order("created_at", { ascending: false });
 
     if (filters?.status) {
@@ -178,10 +223,24 @@ export async function getEmployees(filters?: {
       );
     }
 
+    if (filters?.page !== undefined && filters?.pageSize !== undefined) {
+      const from = (filters.page - 1) * filters.pageSize;
+      const to = from + filters.pageSize - 1;
+      query = query.range(from, to);
+
+      const { data, count, error } = await query;
+
+      if (error) {
+        return { error: formatDatabaseError(error) };
+      }
+
+      return { success: true, data: data || [], total: count || 0 };
+    }
+
     const { data, error } = await query;
 
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     return { success: true, data };
@@ -209,7 +268,7 @@ export async function getEmployeeById(employeeId: string) {
       .single();
 
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     return { success: true, data };
@@ -222,7 +281,11 @@ export async function getEmployeeById(employeeId: string) {
 /**
  * Get orders assigned to an employee
  */
-export async function getEmployeeOrders(employeeId: string) {
+export async function getEmployeeOrders(
+  employeeId: string,
+  page?: number,
+  pageSize?: number,
+) {
   const canRead = await hasPermission("orders", "read");
   if (!canRead) {
     return { error: "Insufficient permissions to view orders" };
@@ -230,14 +293,32 @@ export async function getEmployeeOrders(employeeId: string) {
 
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase
+    let query = supabase
       .from("orders")
-      .select("id, order_number, title, client_name, status, order_date")
+      .select("id, order_number, title, client_name, status, order_date", {
+        count: "exact",
+      })
       .eq("employee_id", employeeId)
       .order("order_date", { ascending: false });
 
+    if (page !== undefined && pageSize !== undefined) {
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      query = query.range(from, to);
+
+      const { data, count, error } = await query;
+
+      if (error) {
+        return { error: formatDatabaseError(error) };
+      }
+
+      return { success: true, data: data || [], total: count || 0 };
+    }
+
+    const { data, error } = await query;
+
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     return { success: true, data };

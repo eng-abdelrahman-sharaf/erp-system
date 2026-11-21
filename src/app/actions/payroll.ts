@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { hasPermission } from "@/lib/permissions/permissions";
+import { formatDatabaseError } from "@/lib/utils/errors";
 
 export interface CreatePayrollPeriodInput {
   employee_id: string;
@@ -39,7 +40,7 @@ export async function createPayrollPeriod(input: CreatePayrollPeriodInput) {
     });
 
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     revalidatePath("/employees");
@@ -87,7 +88,7 @@ export async function deletePayrollPeriod(
       .eq("id", periodId);
 
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     revalidatePath("/employees");
@@ -120,7 +121,7 @@ export async function recordSalaryPayment(input: RecordSalaryPaymentInput) {
     });
 
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     revalidatePath("/employees");
@@ -150,7 +151,7 @@ export async function getPayrollPeriods(employeeId: string) {
       .order("period_start", { ascending: false });
 
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     return { success: true, data };
@@ -163,7 +164,11 @@ export async function getPayrollPeriods(employeeId: string) {
 /**
  * Get payroll summary using the database view
  */
-export async function getPayrollSummary(employeeId?: string) {
+export async function getPayrollSummary(
+  employeeId?: string,
+  page?: number,
+  pageSize?: number,
+) {
   const canRead = await hasPermission("employees", "read");
   if (!canRead) {
     return { error: "Insufficient permissions to view payroll" };
@@ -171,7 +176,9 @@ export async function getPayrollSummary(employeeId?: string) {
 
   try {
     const supabase = await createClient();
-    let query = supabase.from("payroll_summary").select("*");
+    let query = supabase
+      .from("payroll_summary")
+      .select("*", { count: "exact" });
 
     if (employeeId) {
       query = query.eq("employee_id", employeeId);
@@ -179,10 +186,24 @@ export async function getPayrollSummary(employeeId?: string) {
 
     query = query.order("period_start", { ascending: false });
 
+    if (page !== undefined && pageSize !== undefined) {
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      query = query.range(from, to);
+
+      const { data, count, error } = await query;
+
+      if (error) {
+        return { error: formatDatabaseError(error) };
+      }
+
+      return { success: true, data: data || [], total: count || 0 };
+    }
+
     const { data, error } = await query;
 
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     return { success: true, data };
@@ -217,7 +238,7 @@ export async function getSalaryPayments(payrollPeriodId: string) {
       .order("payment_date", { ascending: false });
 
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     return { success: true, data };
@@ -230,7 +251,11 @@ export async function getSalaryPayments(payrollPeriodId: string) {
 /**
  * Get all salary payments for an employee
  */
-export async function getEmployeeSalaryPayments(employeeId: string) {
+export async function getEmployeeSalaryPayments(
+  employeeId: string,
+  page?: number,
+  pageSize?: number,
+) {
   const canRead = await hasPermission("employees", "read");
   if (!canRead) {
     return { error: "Insufficient permissions to view salary payments" };
@@ -250,13 +275,15 @@ export async function getEmployeeSalaryPayments(employeeId: string) {
     }
 
     if (!periods || periods.length === 0) {
-      return { success: true, data: [] };
+      return page !== undefined
+        ? { success: true, data: [], total: 0 }
+        : { success: true, data: [] };
     }
 
     const periodIds = periods.map((p) => p.id);
 
     // Then get all payments for those periods
-    const { data, error } = await supabase
+    let query = supabase
       .from("salary_payments")
       .select(
         `
@@ -269,12 +296,29 @@ export async function getEmployeeSalaryPayments(employeeId: string) {
           full_name
         )
       `,
+        { count: "exact" },
       )
       .in("payroll_period_id", periodIds)
       .order("payment_date", { ascending: false });
 
+    if (page !== undefined && pageSize !== undefined) {
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      query = query.range(from, to);
+
+      const { data, count, error } = await query;
+
+      if (error) {
+        return { error: formatDatabaseError(error) };
+      }
+
+      return { success: true, data: data || [], total: count || 0 };
+    }
+
+    const { data, error } = await query;
+
     if (error) {
-      return { error: error.message };
+      return { error: formatDatabaseError(error) };
     }
 
     return { success: true, data };

@@ -10,24 +10,28 @@ const EmployeeBaseSchema = z.object({
   full_name: z
     .string()
     .min(1, "Full name is required")
-    .max(255, "Full name must be at most 255 characters"),
+    .max(255, "Full name must be at most 255 characters")
+    .refine((val) => val.trim().length > 0, "Full name is required"),
   email: z
     .string()
+    .min(1, "Email is required")
     .email("Invalid email address")
     .max(255, "Email must be at most 255 characters")
-    .nullable()
-    .optional(),
+    .refine((val) => val.trim().length > 0, "Email is required"),
   phone: z
     .string()
+    .min(1, "Phone is required")
     .max(50, "Phone must be at most 50 characters")
-    .nullable()
-    .optional(),
-  address: z.string().nullable().optional(),
+    .refine((val) => val.trim().length > 0, "Phone is required"),
+  address: z
+    .string()
+    .min(1, "Address is required")
+    .refine((val) => val.trim().length > 0, "Address is required"),
   position: z
     .string()
+    .min(1, "Position is required")
     .max(150, "Position must be at most 150 characters")
-    .nullable()
-    .optional(),
+    .refine((val) => val.trim().length > 0, "Position is required"),
   salary: z
     .number()
     .nonnegative("Salary must be non-negative")

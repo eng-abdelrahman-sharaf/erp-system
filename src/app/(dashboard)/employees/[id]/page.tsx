@@ -51,14 +51,17 @@ import {
   getEmployeeSalaryPayments,
   getPayrollSummary,
 } from "@/app/actions/payroll";
+import { Pagination } from "@/components/shared/Pagination";
+
+const SUB_PAGE_SIZE = 10;
 
 interface Employee {
   id: string;
   full_name: string;
-  email: string | null;
-  phone: string | null;
-  address: string | null;
-  position: string | null;
+  email: string;
+  phone: string;
+  address: string;
+  position: string;
   salary: number;
   employment_date: string;
   status: "active" | "inactive";
@@ -110,6 +113,12 @@ function EmployeeDetailsContent() {
     [],
   );
   const [salaryPayments, setSalaryPayments] = useState<SalaryPayment[]>([]);
+  const [ordersTotal, setOrdersTotal] = useState(0);
+  const [payrollTotal, setPayrollTotal] = useState(0);
+  const [paymentsTotal, setPaymentsTotal] = useState(0);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [payrollPage, setPayrollPage] = useState(1);
+  const [paymentsPage, setPaymentsPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [payrollLoading, setPayrollLoading] = useState(true);
@@ -172,34 +181,62 @@ function EmployeeDetailsContent() {
     }
   };
 
-  const loadOrders = async () => {
+  const loadOrders = async (pageNum = ordersPage) => {
     try {
-      const result = await getEmployeeOrders(employeeId);
-      if (result.success && result.data) setOrders(result.data as Order[]);
+      const result = await getEmployeeOrders(employeeId, pageNum, SUB_PAGE_SIZE);
+      if (result.success && result.data) {
+        setOrders(result.data as Order[]);
+        setOrdersTotal(result.total || 0);
+      }
     } finally {
       setOrdersLoading(false);
     }
   };
 
-  const loadPayroll = async () => {
+  const loadPayroll = async (pageNum = payrollPage) => {
     try {
-      const summaryResult = await getPayrollSummary(employeeId);
-      if (summaryResult.success && summaryResult.data)
+      const summaryResult = await getPayrollSummary(employeeId, pageNum, SUB_PAGE_SIZE);
+      if (summaryResult.success && summaryResult.data) {
         setPayrollSummary(summaryResult.data as PayrollSummaryItem[]);
+        setPayrollTotal(summaryResult.total || 0);
+      }
     } finally {
       setPayrollLoading(false);
     }
   };
 
-  const loadPayments = async () => {
+  const loadPayments = async (pageNum = paymentsPage) => {
     try {
-      const result = await getEmployeeSalaryPayments(employeeId);
-      if (result.success && result.data)
+      const result = await getEmployeeSalaryPayments(employeeId, pageNum, SUB_PAGE_SIZE);
+      if (result.success && result.data) {
         setSalaryPayments(result.data as SalaryPayment[]);
+        setPaymentsTotal(result.total || 0);
+      }
     } finally {
       setPaymentsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (activeTab === "orders") {
+      loadOrders(ordersPage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ordersPage]);
+
+  useEffect(() => {
+    if (activeTab === "payroll") {
+      loadPayroll(payrollPage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payrollPage]);
+
+  useEffect(() => {
+    if (activeTab === "payments") {
+      loadPayments(paymentsPage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentsPage]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -215,20 +252,64 @@ function EmployeeDetailsContent() {
     fetchData();
   }, [employeeId]);
 
+  const openEditModal = () => {
+    if (employee) {
+      setEditForm({
+        full_name: employee.full_name,
+        email: employee.email || "",
+        phone: employee.phone || "",
+        address: employee.address || "",
+        position: employee.position || "",
+        salary: employee.salary.toString(),
+        employment_date: parseDateSafe(employee.employment_date) || new Date(),
+        status: employee.status,
+        notes: employee.notes || "",
+      });
+    }
+    setShowEditModal(true);
+  };
+
   const handleUpdateEmployee = async () => {
     if (!employee) return;
+
+    if (!editForm.full_name.trim()) {
+      setError("Full name is required");
+      return;
+    }
+    if (!editForm.email.trim()) {
+      setError("Email is required");
+      return;
+    }
+    if (!editForm.phone.trim()) {
+      setError("Phone number is required");
+      return;
+    }
+    if (!editForm.address.trim()) {
+      setError("Address is required");
+      return;
+    }
+    if (!editForm.position.trim()) {
+      setError("Position is required");
+      return;
+    }
+    const salaryNum = parseFloat(editForm.salary);
+    if (isNaN(salaryNum) || salaryNum < 0) {
+      setError("Please enter a valid salary");
+      return;
+    }
+
     const previousEmployee = employee;
     const updatedEmployee: Employee = {
       ...employee,
-      full_name: editForm.full_name,
-      email: editForm.email || null,
-      phone: editForm.phone || null,
-      address: editForm.address || null,
-      position: editForm.position || null,
-      salary: parseFloat(editForm.salary) || 0,
+      full_name: editForm.full_name.trim(),
+      email: editForm.email.trim(),
+      phone: editForm.phone.trim(),
+      address: editForm.address.trim(),
+      position: editForm.position.trim(),
+      salary: salaryNum,
       employment_date: formatDateToYYYYMMDD(editForm.employment_date),
       status: editForm.status,
-      notes: editForm.notes || null,
+      notes: editForm.notes ? editForm.notes.trim() : null,
     };
 
     setEmployee(updatedEmployee);
@@ -237,10 +318,10 @@ function EmployeeDetailsContent() {
     const result = await updateEmployee({
       id: employeeId,
       full_name: updatedEmployee.full_name,
-      email: updatedEmployee.email || undefined,
-      phone: updatedEmployee.phone || undefined,
-      address: updatedEmployee.address || undefined,
-      position: updatedEmployee.position || undefined,
+      email: updatedEmployee.email,
+      phone: updatedEmployee.phone,
+      address: updatedEmployee.address,
+      position: updatedEmployee.position,
       salary: updatedEmployee.salary,
       employment_date: updatedEmployee.employment_date,
       status: updatedEmployee.status,
@@ -256,10 +337,27 @@ function EmployeeDetailsContent() {
   };
 
   const handleCreatePayrollPeriod = async () => {
+    const salaryAmount = parseFloat(payrollForm.salary_amount);
+    if (!payrollForm.salary_amount.trim() || isNaN(salaryAmount) || salaryAmount <= 0) {
+      toast.error("Please enter a valid salary amount greater than zero");
+      return;
+    }
+    if (!payrollForm.period_start) {
+      toast.error("Period start date is required");
+      return;
+    }
+    if (!payrollForm.period_end) {
+      toast.error("Period end date is required");
+      return;
+    }
+    if (payrollForm.period_end < payrollForm.period_start) {
+      toast.error("Period end date must be on or after the start date");
+      return;
+    }
+
     const previousSummary = payrollSummary;
     const periodStart = formatDateToYYYYMMDD(payrollForm.period_start);
     const periodEnd = formatDateToYYYYMMDD(payrollForm.period_end);
-    const salaryAmount = parseFloat(payrollForm.salary_amount) || 0;
 
     const tempPeriod: PayrollSummaryItem = {
       payroll_period_id: `temp-${Date.now()}`,
@@ -318,9 +416,22 @@ function EmployeeDetailsContent() {
   };
 
   const handleRecordPayment = async () => {
+    if (!paymentForm.payroll_period_id) {
+      toast.error("Please select a payroll period");
+      return;
+    }
+    const paymentAmount = parseFloat(paymentForm.amount);
+    if (!paymentForm.amount.trim() || isNaN(paymentAmount) || paymentAmount <= 0) {
+      toast.error("Please enter a valid payment amount greater than zero");
+      return;
+    }
+    if (!paymentForm.payment_date) {
+      toast.error("Payment date is required");
+      return;
+    }
+
     const previousPayments = salaryPayments;
     const previousSummary = payrollSummary;
-    const paymentAmount = parseFloat(paymentForm.amount) || 0;
     const paymentDate = formatDateToYYYYMMDD(paymentForm.payment_date);
 
     const tempPayment: SalaryPayment = {
@@ -406,7 +517,7 @@ function EmployeeDetailsContent() {
             </p>
           </div>
         </div>
-        <Button onClick={() => setShowEditModal(true)}>
+        <Button onClick={openEditModal}>
           <Edit className="mr-2 h-4 w-4" />
           Edit Employee
         </Button>
@@ -522,6 +633,7 @@ function EmployeeDetailsContent() {
             ) : orders.length === 0 ? (
               <p className="text-gray-600">No orders assigned</p>
             ) : (
+              <>
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
@@ -589,6 +701,13 @@ function EmployeeDetailsContent() {
                   </tbody>
                 </table>
               </div>
+              <Pagination
+                page={ordersPage}
+                pageSize={SUB_PAGE_SIZE}
+                total={ordersTotal}
+                onPageChange={setOrdersPage}
+              />
+              </>
             )}
           </CardContent>
         </Card>
@@ -613,6 +732,7 @@ function EmployeeDetailsContent() {
             ) : payrollSummary.length === 0 ? (
               <p className="text-gray-600">No payroll periods</p>
             ) : (
+              <>
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
@@ -693,6 +813,13 @@ function EmployeeDetailsContent() {
                   </tbody>
                 </table>
               </div>
+              <Pagination
+                page={payrollPage}
+                pageSize={SUB_PAGE_SIZE}
+                total={payrollTotal}
+                onPageChange={setPayrollPage}
+              />
+              </>
             )}
           </CardContent>
         </Card>
@@ -711,6 +838,7 @@ function EmployeeDetailsContent() {
             ) : salaryPayments.length === 0 ? (
               <p className="text-gray-600">No payments recorded</p>
             ) : (
+              <>
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
@@ -764,13 +892,20 @@ function EmployeeDetailsContent() {
                   </tbody>
                 </table>
               </div>
+              <Pagination
+                page={paymentsPage}
+                pageSize={SUB_PAGE_SIZE}
+                total={paymentsTotal}
+                onPageChange={setPaymentsPage}
+              />
+              </>
             )}
           </CardContent>
         </Card>
       )}
 
       {showEditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <CardHeader>
               <CardTitle>Edit Employee</CardTitle>
@@ -792,6 +927,7 @@ function EmployeeDetailsContent() {
                   onChange={(e) =>
                     setEditForm({ ...editForm, email: e.target.value })
                   }
+                  required
                 />
                 <Input
                   label="Phone"
@@ -799,6 +935,7 @@ function EmployeeDetailsContent() {
                   onChange={(e) =>
                     setEditForm({ ...editForm, phone: e.target.value })
                   }
+                  required
                 />
                 <Input
                   label="Address"
@@ -806,6 +943,7 @@ function EmployeeDetailsContent() {
                   onChange={(e) =>
                     setEditForm({ ...editForm, address: e.target.value })
                   }
+                  required
                 />
                 <Input
                   label="Position"
@@ -813,6 +951,7 @@ function EmployeeDetailsContent() {
                   onChange={(e) =>
                     setEditForm({ ...editForm, position: e.target.value })
                   }
+                  required
                 />
                 <Input
                   label="Salary"
@@ -888,7 +1027,7 @@ function EmployeeDetailsContent() {
       )}
 
       {showPayrollModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <Card className="w-full max-w-md">
             <CardHeader>
               <CardTitle>Create Payroll Period</CardTitle>
@@ -962,7 +1101,7 @@ function EmployeeDetailsContent() {
       )}
 
       {showPaymentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <Card className="w-full max-w-md">
             <CardHeader>
               <CardTitle>Record Salary Payment</CardTitle>

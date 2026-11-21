@@ -20,7 +20,6 @@ import { createEmployee } from "@/app/actions/employees";
 
 function NewEmployeeContent() {
   const router = useAppRouter();
-  const [loading, setLoading] = useState(false);
   const [error, setErrorState] = useState("");
 
   const [form, setForm] = useState({
@@ -41,6 +40,22 @@ function NewEmployeeContent() {
       setErrorState("Full name is required");
       return;
     }
+    if (!form.email.trim()) {
+      setErrorState("Email is required");
+      return;
+    }
+    if (!form.phone.trim()) {
+      setErrorState("Phone number is required");
+      return;
+    }
+    if (!form.address.trim()) {
+      setErrorState("Address is required");
+      return;
+    }
+    if (!form.position.trim()) {
+      setErrorState("Position is required");
+      return;
+    }
     const salaryNum = parseFloat(form.salary);
     if (isNaN(salaryNum) || salaryNum < 0) {
       setErrorState("Please enter a valid salary");
@@ -51,16 +66,16 @@ function NewEmployeeContent() {
       return;
     }
 
-    setLoading(true);
+    router.startNavigation("create");
     setErrorState("");
 
     try {
       const result = await createEmployee({
         full_name: form.full_name.trim(),
-        email: form.email.trim() || undefined,
-        phone: form.phone.trim() || undefined,
-        address: form.address.trim() || undefined,
-        position: form.position.trim() || undefined,
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        address: form.address.trim(),
+        position: form.position.trim(),
         salary: salaryNum,
         employment_date: formatDateToYYYYMMDD(form.employment_date),
         status: form.status,
@@ -72,20 +87,20 @@ function NewEmployeeContent() {
         router.push("/employees");
       } else {
         setErrorState(result.error || "Failed to create employee");
-        setLoading(false);
+        router.stopNavigation();
       }
     } catch (err) {
       setErrorState(
         err instanceof Error ? err.message : "Failed to create employee"
       );
-      setLoading(false);
+      router.stopNavigation();
     }
   };
 
   return (
     <div>
       <div className="mb-6 flex items-center gap-4">
-        <BackButton href="/employees" label="Back" />
+        <BackButton label="Back" />
         <h1 className="text-2xl font-bold text-gray-900">Create New Employee</h1>
       </div>
 
@@ -119,6 +134,7 @@ function NewEmployeeContent() {
                   setForm({ ...form, email: e.target.value })
                 }
                 placeholder="john@example.com"
+                required
               />
             </div>
 
@@ -130,6 +146,7 @@ function NewEmployeeContent() {
                   setForm({ ...form, phone: e.target.value })
                 }
                 placeholder="+1 (555) 000-0000"
+                required
               />
               <Input
                 label="Position"
@@ -138,6 +155,7 @@ function NewEmployeeContent() {
                   setForm({ ...form, position: e.target.value })
                 }
                 placeholder="e.g. Warehouse Manager"
+                required
               />
             </div>
 
@@ -198,6 +216,7 @@ function NewEmployeeContent() {
                   setForm({ ...form, address: e.target.value })
                 }
                 placeholder="e.g. 123 Main St, City"
+                required
               />
             </div>
 
@@ -217,15 +236,15 @@ function NewEmployeeContent() {
                 type="button"
                 variant="ghost"
                 onClick={() => router.push("/employees", { target: "cancel" })}
-                disabled={loading || router.isNavigatingTarget("cancel")}
+                disabled={router.isNavigatingTarget("create") || router.isNavigatingTarget("cancel")}
               >
                 {router.isNavigatingTarget("cancel") ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
                 {router.isNavigatingTarget("cancel") ? "Loading" : "Cancel"}
               </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? (
+              <Button type="submit" disabled={router.isNavigatingTarget("create")}>
+                {router.isNavigatingTarget("create") ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Creating...

@@ -6,7 +6,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { DatePicker, formatDateToYYYYMMDD, parseDateSafe } from "@/components/ui/DatePicker";
+import {
+  DatePicker,
+  formatDateToYYYYMMDD,
+  parseDateSafe,
+} from "@/components/ui/DatePicker";
 import {
   Select as SelectShadcn,
   SelectContent,
@@ -31,25 +35,32 @@ import {
   updateEmployee,
   deleteEmployee,
 } from "@/app/actions/employees";
+import { Pagination } from "@/components/shared/Pagination";
+
+const PAGE_SIZE = 10;
 
 interface Employee {
   id: string;
   full_name: string;
-  email: string | null;
-  phone: string | null;
-  position: string | null;
+  email: string;
+  phone: string;
+  address: string;
+  position: string;
   salary: number;
   employment_date: string;
   status: "active" | "inactive";
   created_at: string;
+  notes?: string | null;
 }
 
 export default function EmployeesPage() {
   const router = useAppRouter();
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setErrorState] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   const isNavigatingEmployee = (id: string) =>
     router.isNavigatingTarget(`employee-${id}`);
@@ -80,17 +91,26 @@ export default function EmployeesPage() {
     notes: "",
   });
 
-  const loadData = async (showLoading = true) => {
+  const loadData = async (showLoading = true, pageNum = page) => {
     if (showLoading) setLoading(true);
     setErrorState("");
 
-    const filters: { search?: string; status?: "active" | "inactive" } = {};
+    const filters: {
+      search?: string;
+      status?: "active" | "inactive";
+      page?: number;
+      pageSize?: number;
+    } = {
+      page: pageNum,
+      pageSize: PAGE_SIZE,
+    };
     if (searchQuery) filters.search = searchQuery;
     if (statusFilter !== "all") filters.status = statusFilter;
 
     const result = await getEmployees(filters);
     if (result.success && result.data) {
       setEmployees(result.data as Employee[]);
+      setTotal(result.total || 0);
     } else {
       setError(result.error || "Failed to load employees");
     }
@@ -99,39 +119,77 @@ export default function EmployeesPage() {
   };
 
   useEffect(() => {
-    loadData(true);
+    loadData(true, page);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
+
+  useEffect(() => {
+    if (page === 1) {
+      loadData(true, 1);
+    } else {
+      setPage(1);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, statusFilter]);
 
   const handleCreate = async () => {
+    if (!form.full_name.trim()) {
+      setError("Full name is required");
+      return;
+    }
+    if (!form.email.trim()) {
+      setError("Email is required");
+      return;
+    }
+    if (!form.phone.trim()) {
+      setError("Phone number is required");
+      return;
+    }
+    if (!form.address.trim()) {
+      setError("Address is required");
+      return;
+    }
+    if (!form.position.trim()) {
+      setError("Position is required");
+      return;
+    }
+    const salaryNum = parseFloat(form.salary);
+    if (isNaN(salaryNum) || salaryNum < 0) {
+      setError("Please enter a valid salary");
+      return;
+    }
+
+    const savedAddress = form.address.trim();
+    const savedNotes = form.notes.trim();
+
     const previousEmployees = employees;
     const tempEmployee: Employee = {
       id: `temp-${Date.now()}`,
-      full_name: form.full_name,
-      email: form.email || null,
-      phone: form.phone || null,
-      position: form.position || null,
-      salary: parseFloat(form.salary) || 0,
+      full_name: form.full_name.trim(),
+      email: form.email.trim(),
+      phone: form.phone.trim(),
+      address: savedAddress,
+      position: form.position.trim(),
+      salary: salaryNum,
       employment_date: form.employment_date
         ? formatDateToYYYYMMDD(form.employment_date)
         : formatDateToYYYYMMDD(new Date()),
       status: form.status,
       created_at: new Date().toISOString(),
+      notes: savedNotes || null,
     };
 
     // Optimistically add to table immediately
     setEmployees((prev) => [tempEmployee, ...prev]);
     setShowModal(false);
-    const savedAddress = form.address;
-    const savedNotes = form.notes;
     resetForm();
 
     const result = await createEmployee({
       full_name: tempEmployee.full_name,
-      email: tempEmployee.email || undefined,
-      phone: tempEmployee.phone || undefined,
-      address: savedAddress || undefined,
-      position: tempEmployee.position || undefined,
+      email: tempEmployee.email,
+      phone: tempEmployee.phone,
+      address: savedAddress,
+      position: tempEmployee.position,
       salary: tempEmployee.salary,
       employment_date: tempEmployee.employment_date,
       status: tempEmployee.status,
@@ -150,18 +208,49 @@ export default function EmployeesPage() {
   const handleUpdate = async () => {
     if (!editingEmployee) return;
 
+    if (!form.full_name.trim()) {
+      setError("Full name is required");
+      return;
+    }
+    if (!form.email.trim()) {
+      setError("Email is required");
+      return;
+    }
+    if (!form.phone.trim()) {
+      setError("Phone number is required");
+      return;
+    }
+    if (!form.address.trim()) {
+      setError("Address is required");
+      return;
+    }
+    if (!form.position.trim()) {
+      setError("Position is required");
+      return;
+    }
+    const salaryNum = parseFloat(form.salary);
+    if (isNaN(salaryNum) || salaryNum < 0) {
+      setError("Please enter a valid salary");
+      return;
+    }
+
+    const savedAddress = form.address.trim();
+    const savedNotes = form.notes.trim();
+
     const previousEmployees = employees;
     const updatedEmployee: Employee = {
       ...editingEmployee,
-      full_name: form.full_name,
-      email: form.email || null,
-      phone: form.phone || null,
-      position: form.position || null,
-      salary: parseFloat(form.salary) || 0,
+      full_name: form.full_name.trim(),
+      email: form.email.trim(),
+      phone: form.phone.trim(),
+      address: savedAddress,
+      position: form.position.trim(),
+      salary: salaryNum,
       employment_date: form.employment_date
         ? formatDateToYYYYMMDD(form.employment_date)
         : editingEmployee.employment_date,
       status: form.status,
+      notes: savedNotes || null,
     };
 
     // Optimistically update employee in table immediately
@@ -169,18 +258,16 @@ export default function EmployeesPage() {
       prev.map((e) => (e.id === editingEmployee.id ? updatedEmployee : e)),
     );
     setShowModal(false);
-    const savedAddress = form.address;
-    const savedNotes = form.notes;
     setEditingEmployee(null);
     resetForm();
 
     const result = await updateEmployee({
       id: updatedEmployee.id,
       full_name: updatedEmployee.full_name,
-      email: updatedEmployee.email || undefined,
-      phone: updatedEmployee.phone || undefined,
-      address: savedAddress || undefined,
-      position: updatedEmployee.position || undefined,
+      email: updatedEmployee.email,
+      phone: updatedEmployee.phone,
+      address: savedAddress,
+      position: updatedEmployee.position,
       salary: updatedEmployee.salary,
       employment_date: updatedEmployee.employment_date,
       status: updatedEmployee.status,
@@ -225,12 +312,12 @@ export default function EmployeesPage() {
       full_name: employee.full_name,
       email: employee.email || "",
       phone: employee.phone || "",
-      address: "",
+      address: employee.address || "",
       position: employee.position || "",
       salary: employee.salary.toString(),
       employment_date: parseDateSafe(employee.employment_date),
       status: employee.status,
-      notes: "",
+      notes: employee.notes || "",
     });
     setShowModal(true);
   };
@@ -310,119 +397,127 @@ export default function EmployeesPage() {
           ) : employees.length === 0 ? (
             <p className="text-gray-600">No employees found</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b border-gray-200 bg-gray-50">
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                      Name
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                      Email
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                      Phone
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                      Position
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                      Salary
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                      Employment Date
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {employees.map((employee) => (
-                    <tr
-                      key={employee.id}
-                      className="border-b border-gray-100 hover:bg-gray-50"
-                    >
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <Button
-                          variant="ghost"
-                          onClick={() => {
-                            router.push(`/employees/${employee.id}`, {
-                              target: `employee-${employee.id}`,
-                            });
-                          }}
-                          className="flex items-center gap-2 font-medium text-blue-600 hover:underline"
-                          disabled={isNavigatingEmployee(employee.id)}
-                        >
-                          {isNavigatingEmployee(employee.id) ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <User className="h-4 w-4" />
-                          )}
-                          {employee.full_name}
-                        </Button>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {employee.email || "-"}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {employee.phone || "-"}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {employee.position || "-"}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        ${employee.salary.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span
-                          className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                            employee.status === "active"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {employee.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {new Date(
-                          employee.employment_date,
-                        ).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEdit(employee)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(employee.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-gray-50">
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                        Name
+                      </th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                        Email
+                      </th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                        Phone
+                      </th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                        Position
+                      </th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                        Salary
+                      </th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                        Employment Date
+                      </th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                        Actions
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {employees.map((employee) => (
+                      <tr
+                        key={employee.id}
+                        className="border-b border-gray-100 hover:bg-gray-50"
+                      >
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <Button
+                            variant="ghost"
+                            onClick={() => {
+                              router.push(`/employees/${employee.id}`, {
+                                target: `employee-${employee.id}`,
+                              });
+                            }}
+                            className="flex items-center gap-2 font-medium text-blue-600 hover:underline"
+                            disabled={isNavigatingEmployee(employee.id)}
+                          >
+                            {isNavigatingEmployee(employee.id) ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <User className="h-4 w-4" />
+                            )}
+                            {employee.full_name}
+                          </Button>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          {employee.email || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          {employee.phone || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          {employee.position || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          ${employee.salary.toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <span
+                            className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                              employee.status === "active"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-gray-100 text-gray-800"
+                            }`}
+                          >
+                            {employee.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          {new Date(
+                            employee.employment_date,
+                          ).toLocaleDateString()}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEdit(employee)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(employee.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination
+                page={page}
+                pageSize={PAGE_SIZE}
+                total={total}
+                onPageChange={setPage}
+              />
+            </>
           )}
         </CardContent>
       </Card>
 
       {/* Create/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <CardHeader>
               <CardTitle>
@@ -444,11 +539,13 @@ export default function EmployeesPage() {
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  required
                 />
                 <Input
                   label="Phone"
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  required
                 />
                 <Input
                   label="Address"
@@ -456,6 +553,7 @@ export default function EmployeesPage() {
                   onChange={(e) =>
                     setForm({ ...form, address: e.target.value })
                   }
+                  required
                 />
                 <Input
                   label="Position"
@@ -463,6 +561,7 @@ export default function EmployeesPage() {
                   onChange={(e) =>
                     setForm({ ...form, position: e.target.value })
                   }
+                  required
                 />
                 <Input
                   label="Salary"
