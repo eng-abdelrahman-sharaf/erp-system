@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
 import { DatePicker, formatDateToYYYYMMDD } from "@/components/ui/DatePicker";
 import {
   Select as SelectShadcn,
@@ -20,154 +19,144 @@ import {
   Building,
   User,
   Filter,
+  Loader2,
 } from "lucide-react";
-import { pdf } from "@react-pdf/renderer";
-import {
-  OrdersReport,
-  InventoryReport,
-  InventoryActivityReport,
-  EmployeeReport,
-  PayrollReport,
-} from "@/lib/pdf/reports";
-import {
-  fetchOrdersReportData,
-  fetchInventoryReportData,
-  fetchInventoryActivityReportData,
-  fetchEmployeeReportData,
-  fetchPayrollReportData,
-  ReportFilters,
-} from "@/lib/pdf/data-fetchers";
-
-type ReportType =
-  | "orders"
-  | "inventory"
-  | "inventory-activity"
-  | "employees"
-  | "payroll";
+import { createClient } from "@/lib/supabase/client";
+import { ReportType, ReportFilters } from "@/lib/reports/types";
 
 export default function ReportsPage() {
   const [reportType, setReportType] = useState<ReportType>("orders");
   const [loading, setLoading] = useState(false);
   const [error, setErrorState] = useState("");
 
+  // Filter state
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [warehouseId, setWarehouseId] = useState<string>("all");
+  const [employeeId, setEmployeeId] = useState<string>("all");
+  const [orderStatus, setOrderStatus] = useState<string>("all");
+
+  // Options fetched from DB for dropdowns
+  const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>(
+    [],
+  );
+  const [employees, setEmployees] = useState<{ id: string; name: string }[]>(
+    [],
+  );
+
+  useEffect(() => {
+    async function loadFilterOptions() {
+      try {
+        const supabase = createClient();
+        const [{ data: whData }, { data: empData }] = await Promise.all([
+          supabase.from("warehouses").select("id, name").order("name"),
+          supabase.from("employees").select("id, full_name").order("full_name"),
+        ]);
+
+        if (whData) setWarehouses(whData);
+        if (empData) {
+          setEmployees(
+            empData.map((e) => ({ id: e.id, name: e.full_name })),
+          );
+        }
+      } catch (err) {
+        console.error("Error loading filter options:", err);
+      }
+    }
+    loadFilterOptions();
+  }, []);
+
   const setError = (msg: string) => {
     setErrorState(msg);
     if (msg) toast.error(msg);
   };
 
-  // Filter state
-  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
-  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
-  const [warehouseId, setWarehouseId] = useState("");
-  const [employeeId, setEmployeeId] = useState("");
-  const [orderStatus, setOrderStatus] = useState("");
-
   const reportOptions = [
-    { value: "orders", label: "Orders Report", icon: FileText },
-    { value: "inventory", label: "Inventory Report", icon: Building },
     {
-      value: "inventory-activity",
+      value: "orders" as const,
+      label: "Orders Report",
+      icon: FileText,
+      description: "Customer orders, status, and assigned inventory items",
+    },
+    {
+      value: "inventory" as const,
+      label: "Inventory Report",
+      icon: Building,
+      description: "Current warehouse stock positions and low-stock alerts",
+    },
+    {
+      value: "inventory-activity" as const,
       label: "Inventory Activity Report",
       icon: Filter,
+      description: "Historical stock movement audit log and warehouse transfers",
     },
-    { value: "employees", label: "Employee Report", icon: User },
-    { value: "payroll", label: "Payroll Report", icon: Calendar },
+    {
+      value: "employees" as const,
+      label: "Employee Report",
+      icon: User,
+      description: "Employee directory, assigned customer orders, and payroll summary",
+    },
+    {
+      value: "payroll" as const,
+      label: "Payroll Report",
+      icon: Calendar,
+      description: "Salary payments history and outstanding period balances",
+    },
   ];
 
   const getReportFilters = (): ReportFilters => {
     const filters: ReportFilters = {};
     if (startDate) filters.startDate = formatDateToYYYYMMDD(startDate);
     if (endDate) filters.endDate = formatDateToYYYYMMDD(endDate);
-    if (warehouseId) filters.warehouseId = warehouseId;
-    if (employeeId) filters.employeeId = employeeId;
-    if (orderStatus) filters.orderStatus = orderStatus;
+    if (warehouseId && warehouseId !== "all") filters.warehouseId = warehouseId;
+    if (employeeId && employeeId !== "all") filters.employeeId = employeeId;
+    if (orderStatus && orderStatus !== "all") filters.orderStatus = orderStatus;
     return filters;
   };
 
   const generateReport = async () => {
     setLoading(true);
-    setError("");
+    setErrorState("");
 
     try {
       const filters = getReportFilters();
-      const generationDate = new Date().toISOString();
+      const queryParams = new URLSearchParams();
 
-      let blob: Blob;
+      if (filters.startDate) queryParams.set("startDate", filters.startDate);
+      if (filters.endDate) queryParams.set("endDate", filters.endDate);
+      if (filters.warehouseId) queryParams.set("warehouseId", filters.warehouseId);
+      if (filters.employeeId) queryParams.set("employeeId", filters.employeeId);
+      if (filters.orderStatus) queryParams.set("orderStatus", filters.orderStatus);
 
-      switch (reportType) {
-        case "orders": {
-          const data = await fetchOrdersReportData(filters);
-          const doc = (
-            <OrdersReport
-              data={data}
-              filters={filters}
-              generationDate={generationDate}
-            />
-          );
-          blob = await pdf(doc).toBlob();
-          break;
+      const endpoint = `/api/reports/${reportType}?${queryParams.toString()}`;
+      const response = await fetch(endpoint, {
+        method: "GET",
+      });
+
+      if (!response.ok) {
+        let errorMessage = `Failed to generate report (${response.status})`;
+        try {
+          const errorData = await response.json();
+          if (errorData?.error) errorMessage = errorData.error;
+        } catch {
+          // Response was not JSON
         }
-        case "inventory": {
-          const data = await fetchInventoryReportData(filters);
-          const doc = (
-            <InventoryReport
-              data={data}
-              filters={filters}
-              generationDate={generationDate}
-            />
-          );
-          blob = await pdf(doc).toBlob();
-          break;
-        }
-        case "inventory-activity": {
-          const data = await fetchInventoryActivityReportData(filters);
-          const doc = (
-            <InventoryActivityReport
-              data={data}
-              filters={filters}
-              generationDate={generationDate}
-            />
-          );
-          blob = await pdf(doc).toBlob();
-          break;
-        }
-        case "employees": {
-          const data = await fetchEmployeeReportData(filters);
-          const doc = (
-            <EmployeeReport
-              data={data}
-              filters={filters}
-              generationDate={generationDate}
-            />
-          );
-          blob = await pdf(doc).toBlob();
-          break;
-        }
-        case "payroll": {
-          const data = await fetchPayrollReportData(filters);
-          const doc = (
-            <PayrollReport
-              data={data}
-              filters={filters}
-              generationDate={generationDate}
-            />
-          );
-          blob = await pdf(doc).toBlob();
-          break;
-        }
-        default:
-          throw new Error("Invalid report type");
+        throw new Error(errorMessage);
       }
 
-      // Download the PDF
+      // Download the PDF blob from server
+      const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
+      const dateStr = new Date().toISOString().split("T")[0];
       link.href = url;
-      link.download = `${reportType}-report-${new Date().toISOString().split("T")[0]}.pdf`;
+      link.download = `${reportType}-report-${dateStr}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+
+      toast.success("Report generated and downloaded successfully");
     } catch (err: any) {
       setError(err.message || "Failed to generate report");
     } finally {
@@ -176,7 +165,7 @@ export default function ReportsPage() {
   };
 
   const renderFilters = () => {
-    const commonFilters = (
+    const commonDateFilters = (
       <>
         <div>
           <label className="block text-sm font-medium mb-2">Start Date</label>
@@ -199,11 +188,55 @@ export default function ReportsPage() {
       </>
     );
 
+    const warehouseFilter = (
+      <div>
+        <label className="block text-sm font-medium mb-2">Warehouse</label>
+        <SelectShadcn
+          value={warehouseId}
+          onValueChange={(val) => setWarehouseId(val)}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="All Warehouses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Warehouses</SelectItem>
+            {warehouses.map((wh) => (
+              <SelectItem key={wh.id} value={wh.id}>
+                {wh.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </SelectShadcn>
+      </div>
+    );
+
+    const employeeFilter = (
+      <div>
+        <label className="block text-sm font-medium mb-2">Employee</label>
+        <SelectShadcn
+          value={employeeId}
+          onValueChange={(val) => setEmployeeId(val)}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="All Employees" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Employees</SelectItem>
+            {employees.map((emp) => (
+              <SelectItem key={emp.id} value={emp.id}>
+                {emp.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </SelectShadcn>
+      </div>
+    );
+
     switch (reportType) {
       case "orders":
         return (
           <>
-            {commonFilters}
+            {commonDateFilters}
             <div>
               <label className="block text-sm font-medium mb-2">
                 Order Status
@@ -216,7 +249,7 @@ export default function ReportsPage() {
                   <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Statuses</SelectItem>
+                  <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="in_progress">In Progress</SelectItem>
                   <SelectItem value="paid">Paid</SelectItem>
@@ -224,84 +257,25 @@ export default function ReportsPage() {
                 </SelectContent>
               </SelectShadcn>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Employee ID
-              </label>
-              <Input
-                type="text"
-                value={employeeId}
-                onChange={(e) => setEmployeeId(e.target.value)}
-                placeholder="Enter employee ID"
-                className="w-full"
-              />
-            </div>
+            {employeeFilter}
           </>
         );
       case "inventory":
-        return (
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Warehouse ID
-            </label>
-            <Input
-              type="text"
-              value={warehouseId}
-              onChange={(e) => setWarehouseId(e.target.value)}
-              placeholder="Enter warehouse ID"
-              className="w-full"
-            />
-          </div>
-        );
+        return <>{warehouseFilter}</>;
       case "inventory-activity":
         return (
           <>
-            {commonFilters}
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Warehouse ID
-              </label>
-              <Input
-                type="text"
-                value={warehouseId}
-                onChange={(e) => setWarehouseId(e.target.value)}
-                placeholder="Enter warehouse ID"
-                className="w-full"
-              />
-            </div>
+            {commonDateFilters}
+            {warehouseFilter}
           </>
         );
       case "employees":
-        return (
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Employee ID
-            </label>
-            <Input
-              type="text"
-              value={employeeId}
-              onChange={(e) => setEmployeeId(e.target.value)}
-              placeholder="Enter employee ID"
-              className="w-full"
-            />
-          </div>
-        );
+        return <>{employeeFilter}</>;
       case "payroll":
         return (
           <>
-            {commonFilters}
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Employee ID
-              </label>
-              <Input
-                type="text"
-                value={employeeId}
-                onChange={(e) => setEmployeeId(e.target.value)}
-                placeholder="Enter employee ID"
-                className="w-full"
-              />
-            </div>
+            {commonDateFilters}
+            {employeeFilter}
           </>
         );
       default:
@@ -316,18 +290,18 @@ export default function ReportsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Reports</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
           <p className="text-muted-foreground mt-1">
-            Generate and download PDF reports
+            Generate and export official PDF management reports
           </p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Icon className="w-5 h-5" />
-            Generate Report
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <Icon className="w-5 h-5 text-primary" />
+            Generate {selectedReport?.label}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -353,7 +327,10 @@ export default function ReportsPage() {
           </div>
 
           <div className="border-t pt-6">
-            <h3 className="text-sm font-medium mb-4">Filters</h3>
+            <h3 className="text-sm font-medium mb-4 flex items-center gap-2">
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              Report Filters
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {renderFilters()}
             </div>
@@ -365,14 +342,23 @@ export default function ReportsPage() {
             </div>
           )}
 
-          <div className="flex justify-end">
+          <div className="flex justify-end pt-2">
             <Button
               onClick={generateReport}
               disabled={loading}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 min-w-48"
             >
-              <Download className="w-4 h-4" />
-              {loading ? "Generating..." : "Generate & Download PDF"}
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generating PDF...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  Generate & Download PDF
+                </>
+              )}
             </Button>
           </div>
         </CardContent>
@@ -380,37 +366,39 @@ export default function ReportsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Available Reports</CardTitle>
+          <CardTitle className="text-lg">Available Reports</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {reportOptions.map((option) => {
               const OptionIcon = option.icon;
+              const isSelected = reportType === option.value;
               return (
                 <div
                   key={option.value}
-                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                    reportType === option.value
-                      ? "border-primary bg-primary/5"
-                      : "hover:border-primary/50"
+                  className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                    isSelected
+                      ? "border-primary bg-primary/5 shadow-sm"
+                      : "hover:border-primary/50 hover:bg-muted/50"
                   }`}
-                  onClick={() => setReportType(option.value as ReportType)}
+                  onClick={() => setReportType(option.value)}
                 >
-                  <div className="flex items-center gap-3">
-                    <OptionIcon className="w-5 h-5 text-primary" />
+                  <div className="flex items-start gap-3">
+                    <OptionIcon
+                      className={`w-5 h-5 mt-0.5 ${
+                        isSelected ? "text-primary" : "text-muted-foreground"
+                      }`}
+                    />
                     <div>
-                      <h4 className="font-medium">{option.label}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {option.value === "orders" &&
-                          "Orders, clients, employees, statuses, inventory"}
-                        {option.value === "inventory" &&
-                          "Items, warehouses, stock quantities"}
-                        {option.value === "inventory-activity" &&
-                          "Additions, usage, reservations, transfers"}
-                        {option.value === "employees" &&
-                          "Employee info, assigned orders, payroll"}
-                        {option.value === "payroll" &&
-                          "Salary payments, outstanding balances"}
+                      <h4
+                        className={`font-medium ${
+                          isSelected ? "text-primary" : ""
+                        }`}
+                      >
+                        {option.label}
+                      </h4>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {option.description}
                       </p>
                     </div>
                   </div>
