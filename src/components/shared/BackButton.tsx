@@ -40,11 +40,7 @@ export function BackButton({
       onClick();
       return;
     }
-    if (href) {
-      router.push(href, { target });
-    } else {
-      router.back({ target });
-    }
+    router.back({ target });
   };
 
   const displayText = isLoading

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useNavigationLoading } from "./useNavigationLoading";
 
@@ -46,15 +46,28 @@ export function useAppRouter() {
     [router, startNavigation]
   );
 
-  return {
-    ...router,
-    push,
-    replace,
-    back,
-    isNavigating,
-    navigatingTarget,
-    isNavigatingTarget,
-    startNavigation,
-    stopNavigation,
-  };
+  return useMemo(
+    () => ({
+      ...router,
+      push,
+      replace,
+      back,
+      isNavigating,
+      navigatingTarget,
+      isNavigatingTarget,
+      startNavigation,
+      stopNavigation,
+    }),
+    [
+      router,
+      push,
+      replace,
+      back,
+      isNavigating,
+      navigatingTarget,
+      isNavigatingTarget,
+      startNavigation,
+      stopNavigation,
+    ]
+  );
 }
