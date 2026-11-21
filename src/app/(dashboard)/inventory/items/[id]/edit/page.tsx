@@ -25,7 +25,6 @@ function EditInventoryItemContent() {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     async function loadItem() {
@@ -76,17 +75,16 @@ function EditInventoryItemContent() {
       return;
     }
 
-    setSaving(true);
+    router.startNavigation("save");
     try {
       await updateInventoryItem(itemId, formData);
       toast.success("Item updated successfully");
       router.push(`/inventory/items/${itemId}`);
     } catch (error) {
+      router.stopNavigation();
       toast.error(
         error instanceof Error ? error.message : "Failed to update item",
       );
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -97,7 +95,7 @@ function EditInventoryItemContent() {
   return (
     <div>
       <div className="mb-6 flex items-center gap-4">
-        <BackButton href={`/inventory/items/${itemId}`} label="Back" />
+        <BackButton label="Back" />
         <h1 className="text-2xl font-bold text-gray-900">
           Edit Inventory Item
         </h1>
@@ -146,8 +144,8 @@ function EditInventoryItemContent() {
         </div>
 
         <div className="flex gap-4">
-          <Button type="submit" disabled={saving}>
-            {saving ? "Saving..." : "Save Changes"}
+          <Button type="submit" disabled={router.isNavigatingTarget("save")}>
+            {router.isNavigatingTarget("save") ? "Saving..." : "Save Changes"}
           </Button>
           <Button
             type="button"

@@ -100,7 +100,7 @@ function InventoryItemDetailsContent() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <BackButton href="/inventory" label="Back" />
+          <BackButton label="Back" />
           <h1 className="text-2xl font-bold text-gray-900">{item.name}</h1>
         </div>
         <EditButton

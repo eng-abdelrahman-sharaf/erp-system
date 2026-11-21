@@ -16,21 +16,31 @@ interface WarehouseTransferWithNames extends WarehouseTransfer {
   profiles?: { full_name: string } | null;
 }
 import Link from "next/link";
+import { Pagination } from "@/components/shared/Pagination";
+
+const PAGE_SIZE = 10;
 
 export default function TransfersPage() {
   const [transfers, setTransfers] = useState<WarehouseTransferWithNames[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+
+  async function loadTransfers(pageNum = page) {
+    setLoading(true);
+    const res = await getWarehouseTransfers({
+      page: pageNum,
+      pageSize: PAGE_SIZE,
+    });
+    setTransfers(res.data || []);
+    setTotal(res.total || 0);
+    setLoading(false);
+  }
 
   useEffect(() => {
-    async function loadTransfers() {
-      setLoading(true);
-      const data = await getWarehouseTransfers({});
-      setTransfers(data);
-      setLoading(false);
-    }
-
-    loadTransfers();
-  }, []);
+    loadTransfers(page);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
   const columns = [
     {
@@ -78,7 +88,7 @@ export default function TransfersPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <BackButton href="/inventory/stock" label="Back" />
+          <BackButton label="Back" />
           <h1 className="text-2xl font-bold text-gray-900">
             Warehouse Transfers
           </h1>
@@ -103,7 +113,15 @@ export default function TransfersPage() {
               <Package className="h-8 w-8 animate-spin text-gray-400" />
             </div>
           ) : (
-            <Table columns={columns} data={transfers} />
+            <>
+              <Table columns={columns} data={transfers} />
+              <Pagination
+                page={page}
+                pageSize={PAGE_SIZE}
+                total={total}
+                onPageChange={setPage}
+              />
+            </>
           )}
         </CardContent>
       </Card>

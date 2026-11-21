@@ -18,7 +18,6 @@ export default function NewInventoryItemPage() {
     unit: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(false);
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -46,24 +45,23 @@ export default function NewInventoryItemPage() {
       return;
     }
 
-    setLoading(true);
+    router.startNavigation("create");
     try {
       await createInventoryItem(formData);
       toast.success("Inventory item created successfully");
       router.push("/inventory");
     } catch (error) {
+      router.stopNavigation();
       toast.error(
         error instanceof Error ? error.message : "Failed to create item",
       );
-    } finally {
-      setLoading(false);
     }
   }
 
   return (
     <div>
       <div className="mb-6 flex items-center gap-4">
-        <BackButton href="/inventory" label="Back" />
+        <BackButton label="Back" />
         <h1 className="text-2xl font-bold text-gray-900">New Inventory Item</h1>
       </div>
 
@@ -110,8 +108,8 @@ export default function NewInventoryItemPage() {
         </div>
 
         <div className="flex gap-4">
-          <Button type="submit" disabled={loading}>
-            {loading ? "Creating..." : "Create Item"}
+          <Button type="submit" disabled={router.isNavigatingTarget("create")}>
+            {router.isNavigatingTarget("create") ? "Creating..." : "Create Item"}
           </Button>
           <Button
             type="button"

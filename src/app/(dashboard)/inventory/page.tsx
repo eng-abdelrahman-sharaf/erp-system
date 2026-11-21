@@ -31,25 +31,37 @@ import {
 } from "@/features/inventory/actions";
 import type { InventoryItem } from "@/features/inventory/types";
 import Link from "next/link";
+import { Pagination } from "@/components/shared/Pagination";
+
+const PAGE_SIZE = 10;
 
 export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("created_at-desc");
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
-  async function loadItems() {
+  async function loadItems(pageNum = page) {
     setLoading(true);
-    const data = await getInventoryItems(search, sortBy);
-    setItems(data);
+    const res = await getInventoryItems(search, sortBy, pageNum, PAGE_SIZE);
+    setItems(res.data);
+    setTotal(res.total);
     setLoading(false);
   }
 
   useEffect(() => {
-    loadItems();
+    setPage(1);
+    loadItems(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, sortBy]);
+
+  useEffect(() => {
+    loadItems(page);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
   async function handleDelete(id: string) {
     setDeleteId(id);
@@ -67,8 +79,7 @@ export default function InventoryPage() {
     try {
       await deleteInventoryItem(id);
       toast.success("Item deleted successfully");
-      const data = await getInventoryItems(search, sortBy);
-      setItems(data);
+      await loadItems(page);
     } catch (error) {
       setItems(prevItems);
       toast.error(
@@ -115,10 +126,7 @@ export default function InventoryPage() {
       header: "Actions",
       render: (row: InventoryItem) => (
         <div className="flex gap-2">
-          <ViewButton
-            href={`/inventory/items/${row.id}`}
-            title="View Item"
-          />
+          <ViewButton href={`/inventory/items/${row.id}`} title="View Item" />
           <EditButton
             href={`/inventory/items/${row.id}/edit`}
             title="Edit Item"
@@ -187,7 +195,15 @@ export default function InventoryPage() {
               <Package className="h-8 w-8 animate-spin text-gray-400" />
             </div>
           ) : (
-            <Table columns={columns} data={items} />
+            <>
+              <Table columns={columns} data={items} />
+              <Pagination
+                page={page}
+                pageSize={PAGE_SIZE}
+                total={total}
+                onPageChange={setPage}
+              />
+            </>
           )}
         </CardContent>
       </Card>

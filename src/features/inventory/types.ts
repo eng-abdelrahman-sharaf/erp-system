@@ -10,7 +10,7 @@ export interface InventoryItem {
 export interface Warehouse {
   id: string;
   name: string;
-  address: string | null;
+  address: string;
   description: string | null;
   created_at: string;
 }

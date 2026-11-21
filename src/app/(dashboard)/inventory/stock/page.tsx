@@ -20,9 +20,13 @@ import {
 } from "@/features/inventory/actions";
 import type { InventorySummary } from "@/features/inventory/types";
 import Link from "next/link";
+import { Pagination } from "@/components/shared/Pagination";
+
+const PAGE_SIZE = 10;
 
 export default function StockOverviewPage() {
   const [stock, setStock] = useState<InventorySummary[]>([]);
+  const [total, setTotal] = useState(0);
   const [items, setItems] = useState<{ value: string; label: string }[]>([]);
   const [warehouses, setWarehouses] = useState<
     { value: string; label: string }[]
@@ -32,6 +36,7 @@ export default function StockOverviewPage() {
     warehouse_id: "",
   });
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     async function loadFilters() {
@@ -49,16 +54,28 @@ export default function StockOverviewPage() {
     loadFilters();
   }, []);
 
-  useEffect(() => {
-    async function loadStock() {
-      setLoading(true);
-      const data = await getInventorySummary(filters);
-      setStock(data.filter((s) => s.total_quantity && s.total_quantity > 0));
-      setLoading(false);
-    }
+  async function loadStock(pageNum = page) {
+    setLoading(true);
+    const res = await getInventorySummary({
+      ...filters,
+      page: pageNum,
+      pageSize: PAGE_SIZE,
+    });
+    setStock(res.data || []);
+    setTotal(res.total || 0);
+    setLoading(false);
+  }
 
-    loadStock();
+  useEffect(() => {
+    setPage(1);
+    loadStock(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
+
+  useEffect(() => {
+    loadStock(page);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
   const columns = [
     {
@@ -102,7 +119,7 @@ export default function StockOverviewPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <BackButton href="/inventory" label="Back" />
+          <BackButton label="Back" />
           <h1 className="text-2xl font-bold text-gray-900">Stock Overview</h1>
         </div>
         <div className="flex gap-2">
@@ -142,7 +159,9 @@ export default function StockOverviewPage() {
                 </SelectShadcn>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-600">Warehouse:</span>
+                <span className="text-sm font-medium text-gray-600">
+                  Warehouse:
+                </span>
                 <SelectShadcn
                   value={filters.warehouse_id}
                   onValueChange={(value) =>
@@ -171,7 +190,15 @@ export default function StockOverviewPage() {
               <Package className="h-8 w-8 animate-spin text-gray-400" />
             </div>
           ) : (
-            <Table columns={columns} data={stock} />
+            <>
+              <Table columns={columns} data={stock} />
+              <Pagination
+                page={page}
+                pageSize={PAGE_SIZE}
+                total={total}
+                onPageChange={setPage}
+              />
+            </>
           )}
         </CardContent>
       </Card>

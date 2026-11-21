@@ -29,7 +29,6 @@ export default function NewTransferPage() {
     notes: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<
     { value: string; label: string; id: string }[]
   >([]);
@@ -89,7 +88,7 @@ export default function NewTransferPage() {
       return;
     }
 
-    setLoading(true);
+    router.startNavigation("transfer");
     try {
       await transferInventory(
         formData.item_id,
@@ -101,18 +100,17 @@ export default function NewTransferPage() {
       toast.success("Transfer completed successfully");
       router.push("/inventory/transfers");
     } catch (error) {
+      router.stopNavigation();
       toast.error(
         error instanceof Error ? error.message : "Failed to transfer inventory",
       );
-    } finally {
-      setLoading(false);
     }
   }
 
   return (
     <div>
       <div className="mb-6 flex items-center gap-4">
-        <BackButton href="/inventory/transfers" label="Back" />
+        <BackButton label="Back" />
         <h1 className="text-2xl font-bold text-gray-900">New Transfer</h1>
       </div>
 
@@ -239,8 +237,8 @@ export default function NewTransferPage() {
         </div>
 
         <div className="flex gap-4">
-          <Button type="submit" disabled={loading}>
-            {loading ? "Processing..." : "Transfer"}
+          <Button type="submit" disabled={router.isNavigatingTarget("transfer")}>
+            {router.isNavigatingTarget("transfer") ? "Processing..." : "Transfer"}
           </Button>
           <Button
             type="button"

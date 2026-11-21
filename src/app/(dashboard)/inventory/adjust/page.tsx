@@ -29,7 +29,6 @@ export default function StockAdjustPage() {
     notes: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<{ value: string; label: string }[]>([]);
   const [warehouses, setWarehouses] = useState<
     { value: string; label: string }[]
@@ -76,7 +75,7 @@ export default function StockAdjustPage() {
       return;
     }
 
-    setLoading(true);
+    router.startNavigation("adjust");
     try {
       await adjustInventory(
         formData.item_id,
@@ -88,18 +87,17 @@ export default function StockAdjustPage() {
       toast.success("Stock adjusted successfully");
       router.push("/inventory/stock");
     } catch (error) {
+      router.stopNavigation();
       toast.error(
         error instanceof Error ? error.message : "Failed to adjust stock",
       );
-    } finally {
-      setLoading(false);
     }
   }
 
   return (
     <div>
       <div className="mb-6 flex items-center gap-4">
-        <BackButton href="/inventory/stock" label="Back" />
+        <BackButton label="Back" />
         <h1 className="text-2xl font-bold text-gray-900">Adjust Stock</h1>
       </div>
 
@@ -207,8 +205,8 @@ export default function StockAdjustPage() {
         </div>
 
         <div className="flex gap-4">
-          <Button type="submit" disabled={loading}>
-            {loading ? "Processing..." : "Adjust Stock"}
+          <Button type="submit" disabled={router.isNavigatingTarget("adjust")}>
+            {router.isNavigatingTarget("adjust") ? "Processing..." : "Adjust Stock"}
           </Button>
           <Button
             type="button"

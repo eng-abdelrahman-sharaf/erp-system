@@ -27,9 +27,13 @@ interface InventoryActivityLogWithNames extends InventoryActivityLog {
   orders?: { order_number: string } | null;
 }
 import Link from "next/link";
+import { Pagination } from "@/components/shared/Pagination";
+
+const PAGE_SIZE = 10;
 
 export default function ActivityLogsPage() {
   const [logs, setLogs] = useState<InventoryActivityLogWithNames[]>([]);
+  const [total, setTotal] = useState(0);
   const [items, setItems] = useState<{ value: string; label: string }[]>([]);
   const [warehouses, setWarehouses] = useState<
     { value: string; label: string }[]
@@ -40,6 +44,7 @@ export default function ActivityLogsPage() {
     activity_type: "",
   });
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     async function loadFilters() {
@@ -57,16 +62,28 @@ export default function ActivityLogsPage() {
     loadFilters();
   }, []);
 
-  useEffect(() => {
-    async function loadLogs() {
-      setLoading(true);
-      const data = await getInventoryActivityLogs(filters);
-      setLogs(data);
-      setLoading(false);
-    }
+  async function loadLogs(pageNum = page) {
+    setLoading(true);
+    const res = await getInventoryActivityLogs({
+      ...filters,
+      page: pageNum,
+      pageSize: PAGE_SIZE,
+    });
+    setLogs(res.data || []);
+    setTotal(res.total || 0);
+    setLoading(false);
+  }
 
-    loadLogs();
+  useEffect(() => {
+    setPage(1);
+    loadLogs(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
+
+  useEffect(() => {
+    loadLogs(page);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
   const columns = [
     {
@@ -105,11 +122,6 @@ export default function ActivityLogsPage() {
         row.new_total?.toFixed(2) || "0",
     },
     {
-      key: "notes",
-      header: "Notes",
-      render: (row: InventoryActivityLogWithNames) => row.notes || "-",
-    },
-    {
       key: "created_at",
       header: "Date",
       render: (row: InventoryActivityLogWithNames) =>
@@ -120,7 +132,7 @@ export default function ActivityLogsPage() {
   return (
     <div>
       <div className="mb-6 flex items-center gap-4">
-        <BackButton href="/inventory" label="Back" />
+        <BackButton label="Back" />
         <h1 className="text-2xl font-bold text-gray-900">
           Inventory Activity Logs
         </h1>
@@ -207,7 +219,15 @@ export default function ActivityLogsPage() {
               <Package className="h-8 w-8 animate-spin text-gray-400" />
             </div>
           ) : (
-            <Table columns={columns} data={logs} />
+            <>
+              <Table columns={columns} data={logs} />
+              <Pagination
+                page={page}
+                pageSize={PAGE_SIZE}
+                total={total}
+                onPageChange={setPage}
+              />
+            </>
           )}
         </CardContent>
       </Card>

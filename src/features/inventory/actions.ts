@@ -11,13 +11,31 @@ import {
   AdjustInventorySchema,
   TransferInventorySchema,
 } from "@/lib/validations";
+import { formatDatabaseError } from "@/lib/utils/errors";
 
-export async function getInventoryItems(search?: string, sortBy?: string) {
+export interface PaginatedResult<T> {
+  data: T[];
+  total: number;
+}
+
+export async function getInventoryItems(search?: string, sortBy?: string): Promise<InventoryItem[]>;
+export async function getInventoryItems(
+  search: string | undefined,
+  sortBy: string | undefined,
+  page: number,
+  pageSize: number,
+): Promise<PaginatedResult<InventoryItem>>;
+export async function getInventoryItems(
+  search?: string,
+  sortBy?: string,
+  page?: number,
+  pageSize?: number,
+): Promise<InventoryItem[] | PaginatedResult<InventoryItem>> {
   const supabase = await createClient();
 
   let query = supabase
     .from("inventory_items")
-    .select("*");
+    .select("*", { count: "exact" });
 
   if (search) {
     query = query.or(`name.ilike.%${search}%,sku.ilike.%${search}%`);
@@ -44,6 +62,21 @@ export async function getInventoryItems(search?: string, sortBy?: string) {
       .order("id", { ascending: false });
   }
 
+  if (page !== undefined && pageSize !== undefined) {
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    query = query.range(from, to);
+
+    const { data, count, error } = await query;
+
+    if (error) {
+      console.error("Error fetching inventory items:", error);
+      return { data: [], total: 0 };
+    }
+
+    return { data: (data || []) as InventoryItem[], total: count || 0 };
+  }
+
   const { data, error } = await query;
 
   if (error) {
@@ -51,7 +84,7 @@ export async function getInventoryItems(search?: string, sortBy?: string) {
     return [];
   }
 
-  return data as InventoryItem[];
+  return (data || []) as InventoryItem[];
 }
 
 export async function getInventoryItem(id: string) {
@@ -90,7 +123,7 @@ export async function createInventoryItem(
 
   if (error) {
     console.error("Error creating inventory item:", error);
-    throw error;
+    throw new Error(formatDatabaseError(error));
   }
 
   revalidatePath("/inventory");
@@ -121,7 +154,7 @@ export async function updateInventoryItem(
 
   if (error) {
     console.error("Error updating inventory item:", error);
-    throw error;
+    throw new Error(formatDatabaseError(error));
   }
 
   revalidatePath("/inventory");
@@ -139,22 +172,47 @@ export async function deleteInventoryItem(id: string) {
 
   if (error) {
     console.error("Error deleting inventory item:", error);
-    throw error;
+    throw new Error(formatDatabaseError(error));
   }
 
   revalidatePath("/inventory");
 }
 
-export async function getWarehouses(search?: string) {
+export async function getWarehouses(search?: string): Promise<Warehouse[]>;
+export async function getWarehouses(
+  search: string | undefined,
+  page: number,
+  pageSize: number,
+): Promise<PaginatedResult<Warehouse>>;
+export async function getWarehouses(
+  search?: string,
+  page?: number,
+  pageSize?: number,
+): Promise<Warehouse[] | PaginatedResult<Warehouse>> {
   const supabase = await createClient();
 
   let query = supabase
     .from("warehouses")
-    .select("*")
+    .select("*", { count: "exact" })
     .order("created_at", { ascending: false });
 
   if (search) {
     query = query.or(`name.ilike.%${search}%,address.ilike.%${search}%`);
+  }
+
+  if (page !== undefined && pageSize !== undefined) {
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    query = query.range(from, to);
+
+    const { data, count, error } = await query;
+
+    if (error) {
+      console.error("Error fetching warehouses:", error);
+      return { data: [], total: 0 };
+    }
+
+    return { data: (data || []) as Warehouse[], total: count || 0 };
   }
 
   const { data, error } = await query;
@@ -203,7 +261,7 @@ export async function createWarehouse(
 
   if (error) {
     console.error("Error creating warehouse:", error);
-    throw error;
+    throw new Error(formatDatabaseError(error));
   }
 
   revalidatePath("/warehouses");
@@ -234,7 +292,7 @@ export async function updateWarehouse(
 
   if (error) {
     console.error("Error updating warehouse:", error);
-    throw error;
+    throw new Error(formatDatabaseError(error));
   }
 
   revalidatePath("/warehouses");
@@ -260,7 +318,7 @@ export async function deleteWarehouse(id: string) {
 
   if (error) {
     console.error("Error deleting warehouse:", error);
-    throw error;
+    throw new Error(formatDatabaseError(error));
   }
 
   revalidatePath("/warehouses");
@@ -269,12 +327,14 @@ export async function deleteWarehouse(id: string) {
 export async function getInventorySummary(filters?: {
   item_id?: string;
   warehouse_id?: string;
-}) {
+  page?: number;
+  pageSize?: number;
+}): Promise<any> {
   const supabase = await createClient();
 
   let query = supabase
     .from("inventory_summary")
-    .select("*")
+    .select("*", { count: "exact" })
     .order("item_name", { ascending: true });
 
   if (filters?.item_id) {
@@ -283,6 +343,21 @@ export async function getInventorySummary(filters?: {
 
   if (filters?.warehouse_id) {
     query = query.eq("warehouse_id", filters.warehouse_id);
+  }
+
+  if (filters?.page !== undefined && filters?.pageSize !== undefined) {
+    const from = (filters.page - 1) * filters.pageSize;
+    const to = from + filters.pageSize - 1;
+    query = query.range(from, to);
+
+    const { data, count, error } = await query;
+
+    if (error) {
+      console.error("Error fetching inventory summary:", error);
+      return { data: [], total: 0 };
+    }
+
+    return { data: data || [], total: count || 0 };
   }
 
   const { data, error } = await query;
@@ -380,7 +455,9 @@ export async function getInventoryActivityLogs(filters?: {
   item_id?: string;
   warehouse_id?: string;
   activity_type?: string;
-}) {
+  page?: number;
+  pageSize?: number;
+}): Promise<any> {
   const supabase = await createClient();
 
   let query = supabase
@@ -393,6 +470,7 @@ export async function getInventoryActivityLogs(filters?: {
       profiles (full_name),
       orders (order_number)
     `,
+      { count: "exact" },
     )
     .order("created_at", { ascending: false });
 
@@ -418,6 +496,21 @@ export async function getInventoryActivityLogs(filters?: {
     );
   }
 
+  if (filters?.page !== undefined && filters?.pageSize !== undefined) {
+    const from = (filters.page - 1) * filters.pageSize;
+    const to = from + filters.pageSize - 1;
+    query = query.range(from, to);
+
+    const { data, count, error } = await query;
+
+    if (error) {
+      console.error("Error fetching activity logs:", error);
+      return { data: [], total: 0 };
+    }
+
+    return { data: data || [], total: count || 0 };
+  }
+
   const { data, error } = await query;
 
   if (error) {
@@ -432,7 +525,9 @@ export async function getWarehouseTransfers(filters?: {
   item_id?: string;
   source_warehouse_id?: string;
   destination_warehouse_id?: string;
-}) {
+  page?: number;
+  pageSize?: number;
+}): Promise<any> {
   const supabase = await createClient();
 
   let query = supabase
@@ -445,6 +540,7 @@ export async function getWarehouseTransfers(filters?: {
       destination_warehouse:warehouses!warehouse_transfers_destination_warehouse_id_fkey (name),
       profiles (full_name)
     `,
+      { count: "exact" },
     )
     .order("transfer_date", { ascending: false });
 
@@ -461,6 +557,21 @@ export async function getWarehouseTransfers(filters?: {
       "destination_warehouse_id",
       filters.destination_warehouse_id,
     );
+  }
+
+  if (filters?.page !== undefined && filters?.pageSize !== undefined) {
+    const from = (filters.page - 1) * filters.pageSize;
+    const to = from + filters.pageSize - 1;
+    query = query.range(from, to);
+
+    const { data, count, error } = await query;
+
+    if (error) {
+      console.error("Error fetching transfers:", error);
+      return { data: [], total: 0 };
+    }
+
+    return { data: data || [], total: count || 0 };
   }
 
   const { data, error } = await query;

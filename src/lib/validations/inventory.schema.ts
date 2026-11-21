@@ -10,8 +10,12 @@ export const WarehouseSchema = z.object({
   name: z
     .string()
     .min(1, "Warehouse name is required")
-    .max(255, "Warehouse name must be at most 255 characters"),
-  address: z.string().nullable().optional(),
+    .max(255, "Warehouse name must be at most 255 characters")
+    .refine((val) => val.trim().length > 0, "Warehouse name is required"),
+  address: z
+    .string()
+    .min(1, "Warehouse address is required")
+    .refine((val) => val.trim().length > 0, "Warehouse address is required"),
   description: z.string().nullable().optional(),
   created_at: z.string().datetime().optional(),
 });
