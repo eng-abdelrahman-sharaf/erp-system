@@ -16,43 +16,43 @@ export type Database = {
     Tables: {
       employees: {
         Row: {
-          address: string | null
+          address: string
           created_at: string
-          email: string | null
+          email: string
           employment_date: string
           full_name: string
           id: string
           notes: string | null
-          phone: string | null
-          position: string | null
+          phone: string
+          position: string
           salary: number
           status: Database["public"]["Enums"]["employment_status"]
           updated_at: string
         }
         Insert: {
-          address?: string | null
+          address: string
           created_at?: string
-          email?: string | null
+          email: string
           employment_date: string
           full_name: string
           id?: string
           notes?: string | null
-          phone?: string | null
-          position?: string | null
+          phone: string
+          position: string
           salary?: number
           status?: Database["public"]["Enums"]["employment_status"]
           updated_at?: string
         }
         Update: {
-          address?: string | null
+          address?: string
           created_at?: string
-          email?: string | null
+          email?: string
           employment_date?: string
           full_name?: string
           id?: string
           notes?: string | null
-          phone?: string | null
-          position?: string | null
+          phone?: string
+          position?: string
           salary?: number
           status?: Database["public"]["Enums"]["employment_status"]
           updated_at?: string
@@ -370,11 +370,11 @@ export type Database = {
       }
       orders: {
         Row: {
-          client_address: string | null
+          client_address: string
           client_name: string
-          client_phone: string | null
+          client_phone: string
           created_at: string
-          created_by: string | null
+          created_by: string
           description: string | null
           employee_id: string | null
           id: string
@@ -386,11 +386,11 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          client_address?: string | null
+          client_address: string
           client_name: string
-          client_phone?: string | null
+          client_phone: string
           created_at?: string
-          created_by?: string | null
+          created_by: string
           description?: string | null
           employee_id?: string | null
           id?: string
@@ -402,11 +402,11 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          client_address?: string | null
+          client_address?: string
           client_name?: string
-          client_phone?: string | null
+          client_phone?: string
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           description?: string | null
           employee_id?: string | null
           id?: string
@@ -768,21 +768,21 @@ export type Database = {
       }
       warehouses: {
         Row: {
-          address: string | null
+          address: string
           created_at: string
           description: string | null
           id: string
           name: string
         }
         Insert: {
-          address?: string | null
+          address: string
           created_at?: string
           description?: string | null
           id?: string
           name: string
         }
         Update: {
-          address?: string | null
+          address?: string
           created_at?: string
           description?: string | null
           id?: string
