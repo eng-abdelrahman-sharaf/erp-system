@@ -84,10 +84,10 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 CREATE TABLE IF NOT EXISTS public.employees (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     full_name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE,
-    phone VARCHAR(50),
-    address TEXT,
-    position VARCHAR(150),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    phone VARCHAR(50) NOT NULL,
+    address TEXT NOT NULL,
+    position VARCHAR(150) NOT NULL,
     salary NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (salary >= 0),
     employment_date DATE NOT NULL,
     status public.employment_status NOT NULL DEFAULT 'active',
@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS public.salary_payments (
 CREATE TABLE IF NOT EXISTS public.warehouses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL UNIQUE,
-    address TEXT,
+    address TEXT NOT NULL,
     description TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -164,13 +164,13 @@ CREATE TABLE IF NOT EXISTS public.orders (
     title VARCHAR(255) NOT NULL,
     description TEXT,
     client_name VARCHAR(255) NOT NULL,
-    client_phone VARCHAR(50),
-    client_address TEXT,
+    client_phone VARCHAR(50) NOT NULL,
+    client_address TEXT NOT NULL,
     employee_id UUID REFERENCES public.employees(id) ON DELETE RESTRICT,
     status public.order_status NOT NULL DEFAULT 'pending',
     order_date DATE NOT NULL DEFAULT CURRENT_DATE,
     notes TEXT,
-    created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    created_by UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -395,6 +395,13 @@ DECLARE
     v_actor UUID;
 BEGIN
     v_actor := auth.uid();
+    IF v_actor IS NULL THEN
+        v_actor := COALESCE(
+            NEW.created_by,
+            (SELECT id FROM public.profiles WHERE role_id = (SELECT id FROM public.roles WHERE name = 'Admin' LIMIT 1) LIMIT 1),
+            (SELECT id FROM public.profiles LIMIT 1)
+        );
+    END IF;
 
     IF TG_OP = 'INSERT' THEN
         INSERT INTO public.order_activity_logs(order_id, activity_type, description, performed_by)
