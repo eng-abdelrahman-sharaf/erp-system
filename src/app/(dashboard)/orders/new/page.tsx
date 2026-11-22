@@ -17,6 +17,7 @@ import { DatePicker, formatDateToYYYYMMDD } from "@/components/ui/DatePicker";
 import { Loader2 } from "lucide-react";
 import { BackButton } from "@/components/shared/BackButton";
 import { createOrder, getActiveEmployees } from "@/features/orders/actions";
+import { OrderCreateSchema } from "@/lib/validations";
 
 function NewOrderContent() {
   const router = useAppRouter();
@@ -54,31 +55,44 @@ function NewOrderContent() {
     e.preventDefault();
     setError("");
 
-    if (
-      !form.order_number.trim() ||
-      !form.title.trim() ||
-      !form.client_name.trim() ||
-      !form.client_phone.trim() ||
-      !form.client_address.trim() ||
-      !form.order_date
-    ) {
-      setError("Please fill in all required fields");
+    // Validate using Zod schema
+    const validationResult = OrderCreateSchema.safeParse({
+      order_number: form.order_number,
+      title: form.title,
+      description: form.description || null,
+      client_name: form.client_name,
+      client_phone: form.client_phone,
+      client_address: form.client_address,
+      employee_id: form.employee_id || null,
+      status: "pending",
+      order_date: formatDateToYYYYMMDD(form.order_date),
+      notes: form.notes || null,
+    });
+
+    if (!validationResult.success) {
+      const newErrors: Record<string, string> = {};
+      validationResult.error.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          newErrors[issue.path[0] as string] = issue.message;
+        }
+      });
+      setError(newErrors[Object.keys(newErrors)[0]] || "Validation failed");
       return;
     }
 
     router.startNavigation("create");
     try {
       await createOrder({
-        order_number: form.order_number.trim(),
-        title: form.title.trim(),
-        description: form.description ? form.description.trim() : null,
-        client_name: form.client_name.trim(),
-        client_phone: form.client_phone.trim(),
-        client_address: form.client_address.trim(),
-        employee_id: form.employee_id || null,
-        status: "pending",
-        order_date: formatDateToYYYYMMDD(form.order_date),
-        notes: form.notes ? form.notes.trim() : null,
+        order_number: validationResult.data.order_number,
+        title: validationResult.data.title,
+        description: validationResult.data.description ?? null,
+        client_name: validationResult.data.client_name,
+        client_phone: validationResult.data.client_phone,
+        client_address: validationResult.data.client_address,
+        employee_id: validationResult.data.employee_id ?? null,
+        status: validationResult.data.status,
+        order_date: validationResult.data.order_date,
+        notes: validationResult.data.notes ?? null,
       });
       router.push("/orders");
     } catch (err) {
@@ -218,15 +232,23 @@ function NewOrderContent() {
                 type="button"
                 variant="ghost"
                 onClick={() => router.push("/orders", { target: "cancel" })}
-                disabled={router.isNavigatingTarget("create") || router.isNavigatingTarget("cancel")}
+                disabled={
+                  router.isNavigatingTarget("create") ||
+                  router.isNavigatingTarget("cancel")
+                }
               >
                 {router.isNavigatingTarget("cancel") ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
                 {router.isNavigatingTarget("cancel") ? "Loading" : "Cancel"}
               </Button>
-              <Button type="submit" disabled={router.isNavigatingTarget("create")}>
-                {router.isNavigatingTarget("create") ? "Creating..." : "Create Order"}
+              <Button
+                type="submit"
+                disabled={router.isNavigatingTarget("create")}
+              >
+                {router.isNavigatingTarget("create")
+                  ? "Creating..."
+                  : "Create Order"}
               </Button>
             </div>
           </form>

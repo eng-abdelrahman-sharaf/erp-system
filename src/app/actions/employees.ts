@@ -39,26 +39,6 @@ export async function createEmployee(input: CreateEmployeeInput) {
     return { error: "Insufficient permissions to create employees" };
   }
 
-  if (!input.full_name || !input.full_name.trim()) {
-    return { error: "Full name is required" };
-  }
-
-  if (!input.email || !input.email.trim()) {
-    return { error: "Email is required" };
-  }
-
-  if (!input.phone || !input.phone.trim()) {
-    return { error: "Phone number is required" };
-  }
-
-  if (!input.address || !input.address.trim()) {
-    return { error: "Address is required" };
-  }
-
-  if (!input.position || !input.position.trim()) {
-    return { error: "Position is required" };
-  }
-
   try {
     const supabase = await createClient();
     const { error } = await supabase.from("employees").insert({
@@ -92,22 +72,6 @@ export async function updateEmployee(input: UpdateEmployeeInput) {
   const canUpdate = await hasPermission("employees", "write");
   if (!canUpdate) {
     return { error: "Insufficient permissions to update employees" };
-  }
-
-  if (input.full_name !== undefined && !input.full_name.trim()) {
-    return { error: "Full name cannot be empty" };
-  }
-  if (input.email !== undefined && !input.email.trim()) {
-    return { error: "Email cannot be empty" };
-  }
-  if (input.phone !== undefined && !input.phone.trim()) {
-    return { error: "Phone number cannot be empty" };
-  }
-  if (input.address !== undefined && !input.address.trim()) {
-    return { error: "Address cannot be empty" };
-  }
-  if (input.position !== undefined && !input.position.trim()) {
-    return { error: "Position cannot be empty" };
   }
 
   try {
@@ -324,6 +288,37 @@ export async function getEmployeeOrders(
     return { success: true, data };
   } catch (error) {
     console.error("Get employee orders error:", error);
+    return { error: "An unexpected error occurred" };
+  }
+}
+
+/**
+ * Set employee status (activate/deactivate)
+ */
+export async function setEmployeeStatus(
+  employeeId: string,
+  status: "active" | "inactive",
+) {
+  const canUpdate = await hasPermission("employees", "write");
+  if (!canUpdate) {
+    return { error: "Insufficient permissions to update employee status" };
+  }
+
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("employees")
+      .update({ status })
+      .eq("id", employeeId);
+
+    if (error) {
+      return { error: formatDatabaseError(error) };
+    }
+
+    revalidatePath("/employees");
+    return { success: true };
+  } catch (error) {
+    console.error("Set employee status error:", error);
     return { error: "An unexpected error occurred" };
   }
 }

@@ -28,13 +28,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/AlertDialog";
-import { Plus, Edit, Trash2, User, Loader2 } from "lucide-react";
+import {
+  Plus,
+  Edit,
+  Trash2,
+  User,
+  Loader2,
+  UserRoundX,
+  UserRoundCheck,
+} from "lucide-react";
 import {
   getEmployees,
   createEmployee,
   updateEmployee,
   deleteEmployee,
+  setEmployeeStatus,
 } from "@/app/actions/employees";
+import { EmployeeCreateSchema, EmployeeUpdateSchema } from "@/lib/validations";
 import { Pagination } from "@/components/shared/Pagination";
 
 const PAGE_SIZE = 10;
@@ -60,6 +70,9 @@ export default function EmployeesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setErrorState] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deactivateTarget, setDeactivateTarget] = useState<Employee | null>(
+    null,
+  );
   const [page, setPage] = useState(1);
 
   const isNavigatingEmployee = (id: string) =>
@@ -80,6 +93,17 @@ export default function EmployeesPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [form, setForm] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    address: "",
+    position: "",
+    salary: "",
+    employment_date: undefined as Date | undefined,
+    status: "active" as "active" | "inactive",
+    notes: "",
+  });
+  const [originalForm, setOriginalForm] = useState({
     full_name: "",
     email: "",
     phone: "",
@@ -133,29 +157,28 @@ export default function EmployeesPage() {
   }, [searchQuery, statusFilter]);
 
   const handleCreate = async () => {
-    if (!form.full_name.trim()) {
-      setError("Full name is required");
-      return;
-    }
-    if (!form.email.trim()) {
-      setError("Email is required");
-      return;
-    }
-    if (!form.phone.trim()) {
-      setError("Phone number is required");
-      return;
-    }
-    if (!form.address.trim()) {
-      setError("Address is required");
-      return;
-    }
-    if (!form.position.trim()) {
-      setError("Position is required");
-      return;
-    }
-    const salaryNum = parseFloat(form.salary);
-    if (isNaN(salaryNum) || salaryNum < 0) {
-      setError("Please enter a valid salary");
+    // Validate using Zod schema
+    const validationResult = EmployeeCreateSchema.safeParse({
+      full_name: form.full_name,
+      email: form.email,
+      phone: form.phone,
+      address: form.address,
+      position: form.position,
+      salary: parseFloat(form.salary),
+      employment_date: form.employment_date
+        ? formatDateToYYYYMMDD(form.employment_date)
+        : formatDateToYYYYMMDD(new Date()),
+      status: form.status,
+      notes: form.notes || undefined,
+    });
+    if (!validationResult.success) {
+      const newErrors: Record<string, string> = {};
+      validationResult.error.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          newErrors[issue.path[0] as string] = issue.message;
+        }
+      });
+      setError(newErrors[Object.keys(newErrors)[0]] || "Validation failed");
       return;
     }
 
@@ -165,16 +188,14 @@ export default function EmployeesPage() {
     const previousEmployees = employees;
     const tempEmployee: Employee = {
       id: `temp-${Date.now()}`,
-      full_name: form.full_name.trim(),
-      email: form.email.trim(),
-      phone: form.phone.trim(),
+      full_name: validationResult.data.full_name,
+      email: validationResult.data.email,
+      phone: validationResult.data.phone,
       address: savedAddress,
-      position: form.position.trim(),
-      salary: salaryNum,
-      employment_date: form.employment_date
-        ? formatDateToYYYYMMDD(form.employment_date)
-        : formatDateToYYYYMMDD(new Date()),
-      status: form.status,
+      position: validationResult.data.position,
+      salary: validationResult.data.salary,
+      employment_date: validationResult.data.employment_date,
+      status: validationResult.data.status,
       created_at: new Date().toISOString(),
       notes: savedNotes || null,
     };
@@ -208,29 +229,29 @@ export default function EmployeesPage() {
   const handleUpdate = async () => {
     if (!editingEmployee) return;
 
-    if (!form.full_name.trim()) {
-      setError("Full name is required");
-      return;
-    }
-    if (!form.email.trim()) {
-      setError("Email is required");
-      return;
-    }
-    if (!form.phone.trim()) {
-      setError("Phone number is required");
-      return;
-    }
-    if (!form.address.trim()) {
-      setError("Address is required");
-      return;
-    }
-    if (!form.position.trim()) {
-      setError("Position is required");
-      return;
-    }
-    const salaryNum = parseFloat(form.salary);
-    if (isNaN(salaryNum) || salaryNum < 0) {
-      setError("Please enter a valid salary");
+    // Validate using Zod schema
+    const validationResult = EmployeeUpdateSchema.safeParse({
+      id: editingEmployee.id,
+      full_name: form.full_name,
+      email: form.email,
+      phone: form.phone,
+      address: form.address,
+      position: form.position,
+      salary: parseFloat(form.salary),
+      employment_date: form.employment_date
+        ? formatDateToYYYYMMDD(form.employment_date)
+        : editingEmployee.employment_date,
+      status: form.status,
+      notes: form.notes || undefined,
+    });
+    if (!validationResult.success) {
+      const newErrors: Record<string, string> = {};
+      validationResult.error.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          newErrors[issue.path[0] as string] = issue.message;
+        }
+      });
+      setError(newErrors[Object.keys(newErrors)[0]] || "Validation failed");
       return;
     }
 
@@ -240,16 +261,16 @@ export default function EmployeesPage() {
     const previousEmployees = employees;
     const updatedEmployee: Employee = {
       ...editingEmployee,
-      full_name: form.full_name.trim(),
-      email: form.email.trim(),
-      phone: form.phone.trim(),
+      full_name: validationResult.data.full_name ?? editingEmployee.full_name,
+      email: validationResult.data.email ?? editingEmployee.email,
+      phone: validationResult.data.phone ?? editingEmployee.phone,
       address: savedAddress,
-      position: form.position.trim(),
-      salary: salaryNum,
-      employment_date: form.employment_date
-        ? formatDateToYYYYMMDD(form.employment_date)
-        : editingEmployee.employment_date,
-      status: form.status,
+      position: validationResult.data.position ?? editingEmployee.position,
+      salary: validationResult.data.salary ?? editingEmployee.salary,
+      employment_date:
+        validationResult.data.employment_date ??
+        editingEmployee.employment_date,
+      status: validationResult.data.status ?? editingEmployee.status,
       notes: savedNotes || null,
     };
 
@@ -283,6 +304,53 @@ export default function EmployeesPage() {
     }
   };
 
+  const handleToggleStatus = async (
+    employeeId: string,
+    currentStatus: "active" | "inactive",
+  ) => {
+    const newStatus = currentStatus === "active" ? "inactive" : "active";
+    const previousEmployees = employees;
+
+    // Optimistically update status in table immediately
+    setEmployees((prev) =>
+      prev.map((e) => (e.id === employeeId ? { ...e, status: newStatus } : e)),
+    );
+
+    const result = await setEmployeeStatus(employeeId, newStatus);
+    if (result.success) {
+      toast.success(
+        newStatus === "active"
+          ? "Employee activated successfully"
+          : "Employee deactivated successfully",
+      );
+      loadData(false);
+    } else {
+      setEmployees(previousEmployees);
+      toast.error(result.error || "Failed to update employee status");
+    }
+  };
+
+  const confirmDeactivate = async () => {
+    if (!deactivateTarget) return;
+    const target = deactivateTarget;
+    const previousEmployees = employees;
+
+    // Optimistically deactivate employee immediately and close dialogue
+    setDeactivateTarget(null);
+    setEmployees((prev) =>
+      prev.map((e) => (e.id === target.id ? { ...e, status: "inactive" } : e)),
+    );
+
+    const result = await setEmployeeStatus(target.id, "inactive");
+    if (result.success) {
+      toast.success("Employee deactivated successfully");
+      loadData(false);
+    } else {
+      setEmployees(previousEmployees);
+      toast.error(result.error || "Failed to deactivate employee");
+    }
+  };
+
   const handleDelete = async (employeeId: string) => {
     setDeleteId(employeeId);
   };
@@ -308,7 +376,7 @@ export default function EmployeesPage() {
 
   const openEdit = (employee: Employee) => {
     setEditingEmployee(employee);
-    setForm({
+    const formData = {
       full_name: employee.full_name,
       email: employee.email || "",
       phone: employee.phone || "",
@@ -318,7 +386,9 @@ export default function EmployeesPage() {
       employment_date: parseDateSafe(employee.employment_date),
       status: employee.status,
       notes: employee.notes || "",
-    });
+    };
+    setForm(formData);
+    setOriginalForm(formData);
     setShowModal(true);
   };
 
@@ -493,6 +563,31 @@ export default function EmployeesPage() {
                             <Button
                               variant="ghost"
                               size="sm"
+                              onClick={() => {
+                                if (employee.status === "active") {
+                                  setDeactivateTarget(employee);
+                                } else {
+                                  handleToggleStatus(
+                                    employee.id,
+                                    employee.status,
+                                  );
+                                }
+                              }}
+                              title={
+                                employee.status === "active"
+                                  ? "Deactivate employee"
+                                  : "Activate employee"
+                              }
+                            >
+                              {employee.status === "active" ? (
+                                <UserRoundX className="h-4 w-4 text-red-500" />
+                              ) : (
+                                <UserRoundCheck className="h-4 w-4 text-green-600" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => handleDelete(employee.id)}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -622,6 +717,11 @@ export default function EmployeesPage() {
                   </Button>
                   <Button
                     onClick={editingEmployee ? handleUpdate : handleCreate}
+                    disabled={
+                      editingEmployee
+                        ? JSON.stringify(form) === JSON.stringify(originalForm)
+                        : undefined
+                    }
                   >
                     {editingEmployee ? "Update" : "Create"}
                   </Button>
@@ -648,6 +748,34 @@ export default function EmployeesPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete}>
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={deactivateTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeactivateTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deactivate Employee</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to deactivate{" "}
+              <span className="font-semibold text-gray-900">
+                {deactivateTarget?.full_name || "this employee"}
+              </span>
+              ? They will no longer be able to be assigned to new orders.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeactivateTarget(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeactivate}>
+              Deactivate
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

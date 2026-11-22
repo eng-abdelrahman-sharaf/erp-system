@@ -11,6 +11,7 @@ import {
   getInventoryItem,
   updateInventoryItem,
 } from "@/features/inventory/actions";
+import { InventoryItemUpdateSchema } from "@/lib/validations";
 
 function EditInventoryItemContent() {
   const router = useAppRouter();
@@ -18,6 +19,12 @@ function EditInventoryItemContent() {
   const itemId = params.id as string;
 
   const [formData, setFormData] = useState({
+    name: "",
+    sku: "",
+    description: "",
+    unit: "",
+  });
+  const [originalData, setOriginalData] = useState({
     name: "",
     sku: "",
     description: "",
@@ -31,12 +38,14 @@ function EditInventoryItemContent() {
       try {
         const item = await getInventoryItem(itemId);
         if (item) {
-          setFormData({
+          const data = {
             name: item.name,
             sku: item.sku,
             description: item.description || "",
             unit: item.unit,
-          });
+          };
+          setFormData(data);
+          setOriginalData(data);
         } else {
           toast.error("Item not found");
           router.push("/inventory");
@@ -64,20 +73,35 @@ function EditInventoryItemContent() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const newErrors: Record<string, string> = {};
 
-    if (!formData.name.trim()) newErrors.name = "Name is required";
-    if (!formData.sku.trim()) newErrors.sku = "SKU is required";
-    if (!formData.unit.trim()) newErrors.unit = "Unit is required";
+    // Validate using Zod schema
+    const validationResult = InventoryItemUpdateSchema.safeParse({
+      id: itemId,
+      name: formData.name,
+      sku: formData.sku,
+      description: formData.description || null,
+      unit: formData.unit,
+    });
 
-    if (Object.keys(newErrors).length > 0) {
+    if (!validationResult.success) {
+      const newErrors: Record<string, string> = {};
+      validationResult.error.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          newErrors[issue.path[0] as string] = issue.message;
+        }
+      });
       setErrors(newErrors);
       return;
     }
 
     router.startNavigation("save");
     try {
-      await updateInventoryItem(itemId, formData);
+      await updateInventoryItem(itemId, {
+        name: validationResult.data.name,
+        sku: validationResult.data.sku,
+        description: validationResult.data.description,
+        unit: validationResult.data.unit,
+      });
       toast.success("Item updated successfully");
       router.push(`/inventory/items/${itemId}`);
     } catch (error) {
@@ -144,7 +168,13 @@ function EditInventoryItemContent() {
         </div>
 
         <div className="flex gap-4">
-          <Button type="submit" disabled={router.isNavigatingTarget("save")}>
+          <Button
+            type="submit"
+            disabled={
+              router.isNavigatingTarget("save") ||
+              JSON.stringify(formData) === JSON.stringify(originalData)
+            }
+          >
             {router.isNavigatingTarget("save") ? "Saving..." : "Save Changes"}
           </Button>
           <Button

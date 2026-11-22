@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { getWarehouse, updateWarehouse } from "@/features/inventory/actions";
+import { WarehouseUpdateSchema } from "@/lib/validations";
 
 function EditWarehouseContent() {
   const router = useAppRouter();
@@ -15,6 +16,11 @@ function EditWarehouseContent() {
   const warehouseId = params.id as string;
 
   const [formData, setFormData] = useState({
+    name: "",
+    address: "",
+    description: "",
+  });
+  const [originalData, setOriginalData] = useState({
     name: "",
     address: "",
     description: "",
@@ -27,11 +33,13 @@ function EditWarehouseContent() {
       try {
         const warehouse = await getWarehouse(warehouseId);
         if (warehouse) {
-          setFormData({
+          const data = {
             name: warehouse.name,
             address: warehouse.address || "",
             description: warehouse.description || "",
-          });
+          };
+          setFormData(data);
+          setOriginalData(data);
         } else {
           toast.error("Warehouse not found");
           router.push("/warehouses");
@@ -59,12 +67,22 @@ function EditWarehouseContent() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const newErrors: Record<string, string> = {};
 
-    if (!formData.name.trim()) newErrors.name = "Name is required";
-    if (!formData.address.trim()) newErrors.address = "Address is required";
+    // Validate using Zod schema
+    const validationResult = WarehouseUpdateSchema.safeParse({
+      id: warehouseId,
+      name: formData.name,
+      address: formData.address,
+      description: formData.description || null,
+    });
 
-    if (Object.keys(newErrors).length > 0) {
+    if (!validationResult.success) {
+      const newErrors: Record<string, string> = {};
+      validationResult.error.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          newErrors[issue.path[0] as string] = issue.message;
+        }
+      });
       setErrors(newErrors);
       return;
     }
@@ -72,9 +90,9 @@ function EditWarehouseContent() {
     router.startNavigation("save");
     try {
       await updateWarehouse(warehouseId, {
-        name: formData.name.trim(),
-        address: formData.address.trim(),
-        description: formData.description ? formData.description.trim() : null,
+        name: validationResult.data.name,
+        address: validationResult.data.address,
+        description: validationResult.data.description,
       });
       toast.success("Warehouse updated successfully");
       router.push(`/warehouses/${warehouseId}`);
@@ -130,7 +148,13 @@ function EditWarehouseContent() {
         </div>
 
         <div className="flex gap-4">
-          <Button type="submit" disabled={router.isNavigatingTarget("save")}>
+          <Button
+            type="submit"
+            disabled={
+              router.isNavigatingTarget("save") ||
+              JSON.stringify(formData) === JSON.stringify(originalData)
+            }
+          >
             {router.isNavigatingTarget("save") ? "Saving..." : "Save Changes"}
           </Button>
           <Button

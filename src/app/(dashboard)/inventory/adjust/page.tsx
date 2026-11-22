@@ -18,6 +18,7 @@ import {
   getInventoryItems,
   getWarehouses,
 } from "@/features/inventory/actions";
+import { AdjustInventorySchema } from "@/lib/validations";
 
 export default function StockAdjustPage() {
   const router = useAppRouter();
@@ -62,15 +63,28 @@ export default function StockAdjustPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const newErrors: Record<string, string> = {};
 
-    if (!formData.item_id) newErrors.item_id = "Item is required";
-    if (!formData.warehouse_id)
-      newErrors.warehouse_id = "Warehouse is required";
-    if (!formData.quantity || parseFloat(formData.quantity) <= 0)
-      newErrors.quantity = "Quantity must be greater than 0";
+    // Validate using Zod schema
+    const validationResult = AdjustInventorySchema.safeParse({
+      p_item_id: formData.item_id,
+      p_warehouse_id: formData.warehouse_id,
+      p_activity: formData.activity_type,
+      p_quantity: parseFloat(formData.quantity),
+      p_notes: formData.notes || undefined,
+    });
 
-    if (Object.keys(newErrors).length > 0) {
+    if (!validationResult.success) {
+      const newErrors: Record<string, string> = {};
+      validationResult.error.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          const field = issue.path[0] as string;
+          if (field.startsWith("p_")) {
+            newErrors[field.replace("p_", "")] = issue.message;
+          } else {
+            newErrors[field] = issue.message;
+          }
+        }
+      });
       setErrors(newErrors);
       return;
     }
@@ -78,11 +92,11 @@ export default function StockAdjustPage() {
     router.startNavigation("adjust");
     try {
       await adjustInventory(
-        formData.item_id,
-        formData.warehouse_id,
-        formData.activity_type,
-        parseFloat(formData.quantity),
-        formData.notes || undefined,
+        validationResult.data.p_item_id,
+        validationResult.data.p_warehouse_id,
+        validationResult.data.p_activity,
+        validationResult.data.p_quantity,
+        validationResult.data.p_notes ?? undefined,
       );
       toast.success("Stock adjusted successfully");
       router.push("/inventory/stock");
@@ -206,12 +220,16 @@ export default function StockAdjustPage() {
 
         <div className="flex gap-4">
           <Button type="submit" disabled={router.isNavigatingTarget("adjust")}>
-            {router.isNavigatingTarget("adjust") ? "Processing..." : "Adjust Stock"}
+            {router.isNavigatingTarget("adjust")
+              ? "Processing..."
+              : "Adjust Stock"}
           </Button>
           <Button
             type="button"
             variant="secondary"
-            onClick={() => router.push("/inventory/stock", { target: "cancel" })}
+            onClick={() =>
+              router.push("/inventory/stock", { target: "cancel" })
+            }
             disabled={router.isNavigatingTarget("cancel")}
           >
             {router.isNavigatingTarget("cancel") ? "Loading..." : "Cancel"}

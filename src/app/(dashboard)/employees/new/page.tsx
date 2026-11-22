@@ -17,6 +17,7 @@ import { DatePicker, formatDateToYYYYMMDD } from "@/components/ui/DatePicker";
 import { Loader2 } from "lucide-react";
 import { BackButton } from "@/components/shared/BackButton";
 import { createEmployee } from "@/app/actions/employees";
+import { EmployeeCreateSchema } from "@/lib/validations";
 
 function NewEmployeeContent() {
   const router = useAppRouter();
@@ -36,33 +37,30 @@ function NewEmployeeContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.full_name.trim()) {
-      setErrorState("Full name is required");
-      return;
-    }
-    if (!form.email.trim()) {
-      setErrorState("Email is required");
-      return;
-    }
-    if (!form.phone.trim()) {
-      setErrorState("Phone number is required");
-      return;
-    }
-    if (!form.address.trim()) {
-      setErrorState("Address is required");
-      return;
-    }
-    if (!form.position.trim()) {
-      setErrorState("Position is required");
-      return;
-    }
-    const salaryNum = parseFloat(form.salary);
-    if (isNaN(salaryNum) || salaryNum < 0) {
-      setErrorState("Please enter a valid salary");
-      return;
-    }
-    if (!form.employment_date) {
-      setErrorState("Employment date is required");
+
+    // Validate using Zod schema
+    const validationResult = EmployeeCreateSchema.safeParse({
+      full_name: form.full_name,
+      email: form.email,
+      phone: form.phone,
+      address: form.address,
+      position: form.position,
+      salary: parseFloat(form.salary),
+      employment_date: formatDateToYYYYMMDD(form.employment_date),
+      status: form.status,
+      notes: form.notes || undefined,
+    });
+
+    if (!validationResult.success) {
+      const newErrors: Record<string, string> = {};
+      validationResult.error.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          newErrors[issue.path[0] as string] = issue.message;
+        }
+      });
+      setErrorState(
+        newErrors[Object.keys(newErrors)[0]] || "Validation failed",
+      );
       return;
     }
 
@@ -71,15 +69,15 @@ function NewEmployeeContent() {
 
     try {
       const result = await createEmployee({
-        full_name: form.full_name.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-        address: form.address.trim(),
-        position: form.position.trim(),
-        salary: salaryNum,
-        employment_date: formatDateToYYYYMMDD(form.employment_date),
-        status: form.status,
-        notes: form.notes.trim() || undefined,
+        full_name: validationResult.data.full_name,
+        email: validationResult.data.email,
+        phone: validationResult.data.phone,
+        address: validationResult.data.address,
+        position: validationResult.data.position,
+        salary: validationResult.data.salary,
+        employment_date: validationResult.data.employment_date,
+        status: validationResult.data.status,
+        notes: validationResult.data.notes ?? undefined,
       });
 
       if (result.success) {
@@ -91,7 +89,7 @@ function NewEmployeeContent() {
       }
     } catch (err) {
       setErrorState(
-        err instanceof Error ? err.message : "Failed to create employee"
+        err instanceof Error ? err.message : "Failed to create employee",
       );
       router.stopNavigation();
     }
@@ -101,7 +99,9 @@ function NewEmployeeContent() {
     <div>
       <div className="mb-6 flex items-center gap-4">
         <BackButton label="Back" />
-        <h1 className="text-2xl font-bold text-gray-900">Create New Employee</h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          Create New Employee
+        </h1>
       </div>
 
       {error && (
@@ -130,9 +130,7 @@ function NewEmployeeContent() {
                 label="Email"
                 type="email"
                 value={form.email}
-                onChange={(e) =>
-                  setForm({ ...form, email: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
                 placeholder="john@example.com"
                 required
               />
@@ -142,18 +140,14 @@ function NewEmployeeContent() {
               <Input
                 label="Phone"
                 value={form.phone}
-                onChange={(e) =>
-                  setForm({ ...form, phone: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 placeholder="+1 (555) 000-0000"
                 required
               />
               <Input
                 label="Position"
                 value={form.position}
-                onChange={(e) =>
-                  setForm({ ...form, position: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, position: e.target.value })}
                 placeholder="e.g. Warehouse Manager"
                 required
               />
@@ -166,9 +160,7 @@ function NewEmployeeContent() {
                 step="0.01"
                 min="0"
                 value={form.salary}
-                onChange={(e) =>
-                  setForm({ ...form, salary: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, salary: e.target.value })}
                 placeholder="0.00"
                 required
               />
@@ -212,9 +204,7 @@ function NewEmployeeContent() {
               <Input
                 label="Address"
                 value={form.address}
-                onChange={(e) =>
-                  setForm({ ...form, address: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
                 placeholder="e.g. 123 Main St, City"
                 required
               />
@@ -236,14 +226,20 @@ function NewEmployeeContent() {
                 type="button"
                 variant="ghost"
                 onClick={() => router.push("/employees", { target: "cancel" })}
-                disabled={router.isNavigatingTarget("create") || router.isNavigatingTarget("cancel")}
+                disabled={
+                  router.isNavigatingTarget("create") ||
+                  router.isNavigatingTarget("cancel")
+                }
               >
                 {router.isNavigatingTarget("cancel") ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
                 {router.isNavigatingTarget("cancel") ? "Loading" : "Cancel"}
               </Button>
-              <Button type="submit" disabled={router.isNavigatingTarget("create")}>
+              <Button
+                type="submit"
+                disabled={router.isNavigatingTarget("create")}
+              >
                 {router.isNavigatingTarget("create") ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

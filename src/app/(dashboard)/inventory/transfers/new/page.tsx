@@ -18,6 +18,7 @@ import {
   getInventoryItems,
   getWarehouses,
 } from "@/features/inventory/actions";
+import { TransferInventorySchema } from "@/lib/validations";
 
 export default function NewTransferPage() {
   const router = useAppRouter();
@@ -70,20 +71,28 @@ export default function NewTransferPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const newErrors: Record<string, string> = {};
 
-    if (!formData.item_id) newErrors.item_id = "Item is required";
-    if (!formData.source_warehouse_id)
-      newErrors.source_warehouse_id = "Source warehouse is required";
-    if (!formData.destination_warehouse_id)
-      newErrors.destination_warehouse_id = "Destination warehouse is required";
-    if (formData.source_warehouse_id === formData.destination_warehouse_id)
-      newErrors.destination_warehouse_id =
-        "Source and destination must be different";
-    if (!formData.quantity || parseFloat(formData.quantity) <= 0)
-      newErrors.quantity = "Quantity must be greater than 0";
+    // Validate using Zod schema
+    const validationResult = TransferInventorySchema.safeParse({
+      p_item_id: formData.item_id,
+      p_source_warehouse_id: formData.source_warehouse_id,
+      p_destination_warehouse_id: formData.destination_warehouse_id,
+      p_quantity: parseFloat(formData.quantity),
+      p_notes: formData.notes || undefined,
+    });
 
-    if (Object.keys(newErrors).length > 0) {
+    if (!validationResult.success) {
+      const newErrors: Record<string, string> = {};
+      validationResult.error.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          const field = issue.path[0] as string;
+          if (field.startsWith("p_")) {
+            newErrors[field.replace("p_", "")] = issue.message;
+          } else {
+            newErrors[field] = issue.message;
+          }
+        }
+      });
       setErrors(newErrors);
       return;
     }
@@ -91,11 +100,11 @@ export default function NewTransferPage() {
     router.startNavigation("transfer");
     try {
       await transferInventory(
-        formData.item_id,
-        formData.source_warehouse_id,
-        formData.destination_warehouse_id,
-        parseFloat(formData.quantity),
-        formData.notes || undefined,
+        validationResult.data.p_item_id,
+        validationResult.data.p_source_warehouse_id,
+        validationResult.data.p_destination_warehouse_id,
+        validationResult.data.p_quantity,
+        validationResult.data.p_notes ?? undefined,
       );
       toast.success("Transfer completed successfully");
       router.push("/inventory/transfers");
@@ -237,8 +246,13 @@ export default function NewTransferPage() {
         </div>
 
         <div className="flex gap-4">
-          <Button type="submit" disabled={router.isNavigatingTarget("transfer")}>
-            {router.isNavigatingTarget("transfer") ? "Processing..." : "Transfer"}
+          <Button
+            type="submit"
+            disabled={router.isNavigatingTarget("transfer")}
+          >
+            {router.isNavigatingTarget("transfer")
+              ? "Processing..."
+              : "Transfer"}
           </Button>
           <Button
             type="button"

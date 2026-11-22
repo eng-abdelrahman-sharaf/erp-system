@@ -110,11 +110,21 @@ export default function UsersPage() {
     full_name: "",
     role_id: "",
   });
+  const [originalUserForm, setOriginalUserForm] = useState({
+    email: "",
+    password: "",
+    full_name: "",
+    role_id: "",
+  });
 
   // Role modal state
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [roleForm, setRoleForm] = useState({
+    name: "",
+    description: "",
+  });
+  const [originalRoleForm, setOriginalRoleForm] = useState({
     name: "",
     description: "",
   });
@@ -258,14 +268,32 @@ export default function UsersPage() {
   const handleUpdateUser = async () => {
     if (!editingUser) return;
 
+    // Validate using Zod schema
+    const validationResult = ProfileCreateSchema.safeParse({
+      email: userForm.email,
+      full_name: userForm.full_name,
+      role_id: userForm.role_id,
+      status: editingUser.status,
+    });
+    if (!validationResult.success) {
+      const newErrors: Record<string, string> = {};
+      validationResult.error.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          newErrors[issue.path[0] as string] = issue.message;
+        }
+      });
+      setErrors(newErrors);
+      return;
+    }
+
     const previousUsers = users;
     const availableRoles = allRoles.length > 0 ? allRoles : roles;
     const selectedRole = availableRoles.find((r) => r.id === userForm.role_id);
     const updatedUser: User = {
       ...editingUser,
-      full_name: userForm.full_name,
+      full_name: validationResult.data.full_name,
       roles: {
-        id: userForm.role_id,
+        id: validationResult.data.role_id,
         name: selectedRole?.name || editingUser.roles.name,
       },
     };
@@ -504,21 +532,25 @@ export default function UsersPage() {
 
   const openEditUser = (user: User) => {
     setEditingUser(user);
-    setUserForm({
+    const formData = {
       email: user.email,
       password: "",
       full_name: user.full_name,
       role_id: user.roles.id,
-    });
+    };
+    setUserForm(formData);
+    setOriginalUserForm(formData);
     setShowUserModal(true);
   };
 
   const openEditRole = (role: Role) => {
     setEditingRole(role);
-    setRoleForm({
+    const formData = {
       name: role.name,
       description: role.description || "",
-    });
+    };
+    setRoleForm(formData);
+    setOriginalRoleForm(formData);
 
     // Set permissions from role
     const perms: Record<ModuleName, { can_read: boolean; can_write: boolean }> =
@@ -867,7 +899,15 @@ export default function UsersPage() {
             >
               Cancel
             </Button>
-            <Button onClick={editingUser ? handleUpdateUser : handleCreateUser}>
+            <Button
+              onClick={editingUser ? handleUpdateUser : handleCreateUser}
+              disabled={
+                editingUser
+                  ? JSON.stringify(userForm) ===
+                    JSON.stringify(originalUserForm)
+                  : undefined
+              }
+            >
               {editingUser ? "Update" : "Create"}
             </Button>
           </DialogFooter>
@@ -921,8 +961,11 @@ export default function UsersPage() {
                         setPermissions({
                           ...permissions,
                           [module]: {
-                            ...permissions[module],
                             can_read: checked === true,
+                            can_write:
+                              checked === true
+                                ? permissions[module].can_write
+                                : false,
                           },
                         })
                       }
@@ -964,7 +1007,15 @@ export default function UsersPage() {
             >
               Cancel
             </Button>
-            <Button onClick={editingRole ? handleUpdateRole : handleCreateRole}>
+            <Button
+              onClick={editingRole ? handleUpdateRole : handleCreateRole}
+              disabled={
+                editingRole
+                  ? JSON.stringify(roleForm) ===
+                    JSON.stringify(originalRoleForm)
+                  : undefined
+              }
+            >
               {editingRole ? "Update" : "Create"}
             </Button>
           </DialogFooter>

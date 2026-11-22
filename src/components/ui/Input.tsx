@@ -5,8 +5,8 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   error?: string;
 }
 
-export function Input({ className, label, error, ...props }: InputProps) {
-  const isRequired = props.required;
+export function Input({ className, label, error, required,...props }: InputProps) {
+  const isRequired = required;
   const hasAsterisk = typeof label === "string" && label.includes("*");
 
   return (

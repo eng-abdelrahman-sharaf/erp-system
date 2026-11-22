@@ -15,7 +15,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/SelectShadcn";
-import { DatePicker, formatDateToYYYYMMDD, parseDateSafe } from "@/components/ui/DatePicker";
+import {
+  DatePicker,
+  formatDateToYYYYMMDD,
+  parseDateSafe,
+} from "@/components/ui/DatePicker";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,6 +47,7 @@ import {
   getEmployeeOrders,
   updateEmployee,
 } from "@/app/actions/employees";
+import { EmployeeUpdateSchema } from "@/lib/validations";
 import {
   getPayrollPeriods,
   createPayrollPeriod,
@@ -143,6 +148,17 @@ function EmployeeDetailsContent() {
     status: "active" as "active" | "inactive",
     notes: "",
   });
+  const [originalEditForm, setOriginalEditForm] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    address: "",
+    position: "",
+    salary: "",
+    employment_date: new Date(),
+    status: "active" as "active" | "inactive",
+    notes: "",
+  });
 
   const [showPayrollModal, setShowPayrollModal] = useState(false);
   const [payrollForm, setPayrollForm] = useState({
@@ -172,7 +188,8 @@ function EmployeeDetailsContent() {
         address: result.data.address || "",
         position: result.data.position || "",
         salary: result.data.salary.toString(),
-        employment_date: parseDateSafe(result.data.employment_date) || new Date(),
+        employment_date:
+          parseDateSafe(result.data.employment_date) || new Date(),
         status: result.data.status,
         notes: result.data.notes || "",
       });
@@ -183,7 +200,11 @@ function EmployeeDetailsContent() {
 
   const loadOrders = async (pageNum = ordersPage) => {
     try {
-      const result = await getEmployeeOrders(employeeId, pageNum, SUB_PAGE_SIZE);
+      const result = await getEmployeeOrders(
+        employeeId,
+        pageNum,
+        SUB_PAGE_SIZE,
+      );
       if (result.success && result.data) {
         setOrders(result.data as Order[]);
         setOrdersTotal(result.total || 0);
@@ -195,7 +216,11 @@ function EmployeeDetailsContent() {
 
   const loadPayroll = async (pageNum = payrollPage) => {
     try {
-      const summaryResult = await getPayrollSummary(employeeId, pageNum, SUB_PAGE_SIZE);
+      const summaryResult = await getPayrollSummary(
+        employeeId,
+        pageNum,
+        SUB_PAGE_SIZE,
+      );
       if (summaryResult.success && summaryResult.data) {
         setPayrollSummary(summaryResult.data as PayrollSummaryItem[]);
         setPayrollTotal(summaryResult.total || 0);
@@ -207,7 +232,11 @@ function EmployeeDetailsContent() {
 
   const loadPayments = async (pageNum = paymentsPage) => {
     try {
-      const result = await getEmployeeSalaryPayments(employeeId, pageNum, SUB_PAGE_SIZE);
+      const result = await getEmployeeSalaryPayments(
+        employeeId,
+        pageNum,
+        SUB_PAGE_SIZE,
+      );
       if (result.success && result.data) {
         setSalaryPayments(result.data as SalaryPayment[]);
         setPaymentsTotal(result.total || 0);
@@ -254,7 +283,7 @@ function EmployeeDetailsContent() {
 
   const openEditModal = () => {
     if (employee) {
-      setEditForm({
+      const formData = {
         full_name: employee.full_name,
         email: employee.email || "",
         phone: employee.phone || "",
@@ -264,7 +293,9 @@ function EmployeeDetailsContent() {
         employment_date: parseDateSafe(employee.employment_date) || new Date(),
         status: employee.status,
         notes: employee.notes || "",
-      });
+      };
+      setEditForm(formData);
+      setOriginalEditForm(formData);
     }
     setShowEditModal(true);
   };
@@ -272,44 +303,44 @@ function EmployeeDetailsContent() {
   const handleUpdateEmployee = async () => {
     if (!employee) return;
 
-    if (!editForm.full_name.trim()) {
-      setError("Full name is required");
-      return;
-    }
-    if (!editForm.email.trim()) {
-      setError("Email is required");
-      return;
-    }
-    if (!editForm.phone.trim()) {
-      setError("Phone number is required");
-      return;
-    }
-    if (!editForm.address.trim()) {
-      setError("Address is required");
-      return;
-    }
-    if (!editForm.position.trim()) {
-      setError("Position is required");
-      return;
-    }
-    const salaryNum = parseFloat(editForm.salary);
-    if (isNaN(salaryNum) || salaryNum < 0) {
-      setError("Please enter a valid salary");
+    // Validate using Zod schema
+    const validationResult = EmployeeUpdateSchema.safeParse({
+      id: employeeId,
+      full_name: editForm.full_name,
+      email: editForm.email,
+      phone: editForm.phone,
+      address: editForm.address,
+      position: editForm.position,
+      salary: parseFloat(editForm.salary),
+      employment_date: formatDateToYYYYMMDD(editForm.employment_date),
+      status: editForm.status,
+      notes: editForm.notes || undefined,
+    });
+
+    if (!validationResult.success) {
+      const newErrors: Record<string, string> = {};
+      validationResult.error.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          newErrors[issue.path[0] as string] = issue.message;
+        }
+      });
+      setError(newErrors[Object.keys(newErrors)[0]] || "Validation failed");
       return;
     }
 
     const previousEmployee = employee;
     const updatedEmployee: Employee = {
       ...employee,
-      full_name: editForm.full_name.trim(),
-      email: editForm.email.trim(),
-      phone: editForm.phone.trim(),
-      address: editForm.address.trim(),
-      position: editForm.position.trim(),
-      salary: salaryNum,
-      employment_date: formatDateToYYYYMMDD(editForm.employment_date),
-      status: editForm.status,
-      notes: editForm.notes ? editForm.notes.trim() : null,
+      full_name: validationResult.data.full_name ?? employee.full_name,
+      email: validationResult.data.email ?? employee.email,
+      phone: validationResult.data.phone ?? employee.phone,
+      address: validationResult.data.address ?? employee.address,
+      position: validationResult.data.position ?? employee.position,
+      salary: validationResult.data.salary ?? employee.salary,
+      employment_date:
+        validationResult.data.employment_date ?? employee.employment_date,
+      status: validationResult.data.status ?? employee.status,
+      notes: validationResult.data.notes ?? null,
     };
 
     setEmployee(updatedEmployee);
@@ -325,7 +356,7 @@ function EmployeeDetailsContent() {
       salary: updatedEmployee.salary,
       employment_date: updatedEmployee.employment_date,
       status: updatedEmployee.status,
-      notes: updatedEmployee.notes || undefined,
+      notes: updatedEmployee.notes ?? undefined,
     });
     if (result.success) {
       toast.success("Employee updated successfully");
@@ -338,7 +369,11 @@ function EmployeeDetailsContent() {
 
   const handleCreatePayrollPeriod = async () => {
     const salaryAmount = parseFloat(payrollForm.salary_amount);
-    if (!payrollForm.salary_amount.trim() || isNaN(salaryAmount) || salaryAmount <= 0) {
+    if (
+      !payrollForm.salary_amount.trim() ||
+      isNaN(salaryAmount) ||
+      salaryAmount <= 0
+    ) {
       toast.error("Please enter a valid salary amount greater than zero");
       return;
     }
@@ -421,7 +456,11 @@ function EmployeeDetailsContent() {
       return;
     }
     const paymentAmount = parseFloat(paymentForm.amount);
-    if (!paymentForm.amount.trim() || isNaN(paymentAmount) || paymentAmount <= 0) {
+    if (
+      !paymentForm.amount.trim() ||
+      isNaN(paymentAmount) ||
+      paymentAmount <= 0
+    ) {
       toast.error("Please enter a valid payment amount greater than zero");
       return;
     }
@@ -634,79 +673,79 @@ function EmployeeDetailsContent() {
               <p className="text-gray-600">No orders assigned</p>
             ) : (
               <>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="border-b border-gray-200 bg-gray-50">
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                        Order Number
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                        Title
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                        Client
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                        Status
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                        Order Date
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orders.map((order) => (
-                      <tr
-                        key={order.id}
-                        className="border-b border-gray-100 hover:bg-gray-50"
-                      >
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          <Button
-                            variant="ghost"
-                            onClick={() => {
-                              router.push(`/orders/${order.id}`, {
-                                target: `order-${order.id}`,
-                              });
-                            }}
-                            className="flex items-center font-medium text-blue-600 hover:underline"
-                            disabled={isNavigatingOrder(order.id)}
-                          >
-                            {isNavigatingOrder(order.id) ? (
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                              <ShoppingCart className="mr-2 h-4 w-4" />
-                            )}
-                            {order.order_number}
-                          </Button>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          {order.title}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          {order.client_name}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          <span
-                            className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${order.status === "paid" ? "bg-green-100 text-green-800" : order.status === "cancelled" ? "bg-red-100 text-red-800" : order.status === "in_progress" ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"}`}
-                          >
-                            {order.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          {new Date(order.order_date).toLocaleDateString()}
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-gray-50">
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Order Number
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Title
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Client
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Order Date
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <Pagination
-                page={ordersPage}
-                pageSize={SUB_PAGE_SIZE}
-                total={ordersTotal}
-                onPageChange={setOrdersPage}
-              />
+                    </thead>
+                    <tbody>
+                      {orders.map((order) => (
+                        <tr
+                          key={order.id}
+                          className="border-b border-gray-100 hover:bg-gray-50"
+                        >
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            <Button
+                              variant="ghost"
+                              onClick={() => {
+                                router.push(`/orders/${order.id}`, {
+                                  target: `order-${order.id}`,
+                                });
+                              }}
+                              className="flex items-center font-medium text-blue-600 hover:underline"
+                              disabled={isNavigatingOrder(order.id)}
+                            >
+                              {isNavigatingOrder(order.id) ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <ShoppingCart className="mr-2 h-4 w-4" />
+                              )}
+                              {order.order_number}
+                            </Button>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            {order.title}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            {order.client_name}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            <span
+                              className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${order.status === "paid" ? "bg-green-100 text-green-800" : order.status === "cancelled" ? "bg-red-100 text-red-800" : order.status === "in_progress" ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"}`}
+                            >
+                              {order.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            {new Date(order.order_date).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <Pagination
+                  page={ordersPage}
+                  pageSize={SUB_PAGE_SIZE}
+                  total={ordersTotal}
+                  onPageChange={setOrdersPage}
+                />
               </>
             )}
           </CardContent>
@@ -733,92 +772,95 @@ function EmployeeDetailsContent() {
               <p className="text-gray-600">No payroll periods</p>
             ) : (
               <>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="border-b border-gray-200 bg-gray-50">
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                        Period Start
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                        Period End
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                        Salary
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                        Paid
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                        Outstanding
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {payrollSummary.map((summary) => (
-                      <tr
-                        key={summary.payroll_period_id}
-                        className="border-b border-gray-100 hover:bg-gray-50"
-                      >
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          {new Date(summary.period_start).toLocaleDateString()}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          {new Date(summary.period_end).toLocaleDateString()}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          ${summary.salary_amount.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          ${summary.total_paid.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3 text-sm font-semibold text-gray-900">
-                          ${summary.outstanding.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          <div className="flex gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setPaymentForm({
-                                  ...paymentForm,
-                                  payroll_period_id: summary.payroll_period_id,
-                                  payment_date: new Date(),
-                                });
-                                setShowPaymentModal(true);
-                              }}
-                              disabled={summary.outstanding <= 0}
-                            >
-                              <DollarSign className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                handleDeletePayrollPeriod(
-                                  summary.payroll_period_id,
-                                )
-                              }
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-gray-50">
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Period Start
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Period End
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Salary
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Paid
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Outstanding
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Actions
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <Pagination
-                page={payrollPage}
-                pageSize={SUB_PAGE_SIZE}
-                total={payrollTotal}
-                onPageChange={setPayrollPage}
-              />
+                    </thead>
+                    <tbody>
+                      {payrollSummary.map((summary) => (
+                        <tr
+                          key={summary.payroll_period_id}
+                          className="border-b border-gray-100 hover:bg-gray-50"
+                        >
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            {new Date(
+                              summary.period_start,
+                            ).toLocaleDateString()}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            {new Date(summary.period_end).toLocaleDateString()}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            ${summary.salary_amount.toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            ${summary.total_paid.toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                            ${summary.outstanding.toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setPaymentForm({
+                                    ...paymentForm,
+                                    payroll_period_id:
+                                      summary.payroll_period_id,
+                                    payment_date: new Date(),
+                                  });
+                                  setShowPaymentModal(true);
+                                }}
+                                disabled={summary.outstanding <= 0}
+                              >
+                                <DollarSign className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  handleDeletePayrollPeriod(
+                                    summary.payroll_period_id,
+                                  )
+                                }
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <Pagination
+                  page={payrollPage}
+                  pageSize={SUB_PAGE_SIZE}
+                  total={payrollTotal}
+                  onPageChange={setPayrollPage}
+                />
               </>
             )}
           </CardContent>
@@ -839,65 +881,67 @@ function EmployeeDetailsContent() {
               <p className="text-gray-600">No payments recorded</p>
             ) : (
               <>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="border-b border-gray-200 bg-gray-50">
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                        Payment Date
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                        Amount
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                        Method
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                        Reference
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                        Recorded By
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                        Notes
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {salaryPayments.map((payment) => (
-                      <tr
-                        key={payment.id}
-                        className="border-b border-gray-100 hover:bg-gray-50"
-                      >
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          {new Date(payment.payment_date).toLocaleDateString()}
-                        </td>
-                        <td className="px-4 py-3 text-sm font-semibold text-gray-900">
-                          ${payment.amount.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 capitalize">
-                          {payment.method.replace("_", " ")}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          {payment.reference_number || "-"}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          {payment.profiles?.full_name || "-"}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          {payment.notes || "-"}
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-gray-50">
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Payment Date
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Amount
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Method
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Reference
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Recorded By
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Notes
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <Pagination
-                page={paymentsPage}
-                pageSize={SUB_PAGE_SIZE}
-                total={paymentsTotal}
-                onPageChange={setPaymentsPage}
-              />
+                    </thead>
+                    <tbody>
+                      {salaryPayments.map((payment) => (
+                        <tr
+                          key={payment.id}
+                          className="border-b border-gray-100 hover:bg-gray-50"
+                        >
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            {new Date(
+                              payment.payment_date,
+                            ).toLocaleDateString()}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                            ${payment.amount.toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700 capitalize">
+                            {payment.method.replace("_", " ")}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            {payment.reference_number || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            {payment.profiles?.full_name || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            {payment.notes || "-"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <Pagination
+                  page={paymentsPage}
+                  pageSize={SUB_PAGE_SIZE}
+                  total={paymentsTotal}
+                  onPageChange={setPaymentsPage}
+                />
               </>
             )}
           </CardContent>
@@ -1018,7 +1062,15 @@ function EmployeeDetailsContent() {
                   >
                     Cancel
                   </Button>
-                  <Button onClick={handleUpdateEmployee}>Update</Button>
+                  <Button
+                    onClick={handleUpdateEmployee}
+                    disabled={
+                      JSON.stringify(editForm) ===
+                      JSON.stringify(originalEditForm)
+                    }
+                  >
+                    Update
+                  </Button>
                 </div>
               </div>
             </CardContent>
