@@ -102,8 +102,15 @@ export default function UsersPage() {
   );
 
   // User modal state
-  const [showUserModal, setShowUserModal] = useState(false);
+  const [showUserModal, setShowUserModalState] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+
+  const setShowUserModal = (show: boolean) => {
+    setShowUserModalState(show);
+    if (!show) {
+      setErrors({});
+    }
+  };
   const [userForm, setUserForm] = useState({
     email: "",
     password: "",
@@ -118,8 +125,15 @@ export default function UsersPage() {
   });
 
   // Role modal state
-  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [showRoleModal, setShowRoleModalState] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
+
+  const setShowRoleModal = (show: boolean) => {
+    setShowRoleModalState(show);
+    if (!show) {
+      setErrors({});
+    }
+  };
   const [roleForm, setRoleForm] = useState({
     name: "",
     description: "",
@@ -154,10 +168,7 @@ export default function UsersPage() {
       setUsers(usersResult.data as User[]);
       setUsersTotal(usersResult.total || 0);
     } else if (usersResult.error) {
-      setErrors((prev) => ({
-        ...prev,
-        general: usersResult.error || "Failed to load users",
-      }));
+      toast.error(usersResult.error || "Failed to load users");
     }
 
     if (showLoading) setLoading(false);
@@ -172,10 +183,7 @@ export default function UsersPage() {
       setRoles(rolesResult.data as Role[]);
       setRolesTotal(rolesResult.total || 0);
     } else {
-      setErrors((prev) => ({
-        ...prev,
-        general: rolesResult.error || "Failed to load roles",
-      }));
+      toast.error(rolesResult.error || "Failed to load roles");
     }
 
     if (showLoading) setLoading(false);
@@ -615,12 +623,6 @@ export default function UsersPage() {
           </Button>
         </div>
       </div>
-
-      {errors.general && (
-        <div className="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
-          {errors.general}
-        </div>
-      )}
 
       {activeTab === "users" ? (
         <Card>

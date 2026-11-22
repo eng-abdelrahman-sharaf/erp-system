@@ -35,10 +35,9 @@ function EditOrderContent() {
   const orderId = params.id as string;
 
   const [loading, setLoading] = useState(true);
-  const [error, setErrorState] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const setError = (msg: string) => {
-    setErrorState(msg);
     if (msg) toast.error(msg);
   };
   const [order, setOrder] = useState<OrderWithEmployee | null>(null);
@@ -104,7 +103,7 @@ function EditOrderContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
+    setErrors({});
 
     // Validate using Zod schema
     const validationResult = OrderUpdateSchema.safeParse({
@@ -128,7 +127,7 @@ function EditOrderContent() {
           newErrors[issue.path[0] as string] = issue.message;
         }
       });
-      setError(newErrors[Object.keys(newErrors)[0]] || "Validation failed");
+      setErrors(newErrors);
       return;
     }
 
@@ -147,7 +146,9 @@ function EditOrderContent() {
       });
       router.push(`/orders/${orderId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update order");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update order",
+      );
       router.stopNavigation();
     }
   };
@@ -187,12 +188,6 @@ function EditOrderContent() {
         <h1 className="text-2xl font-bold text-gray-900">Edit Order</h1>
       </div>
 
-      {error && (
-        <div className="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
       <Card>
         <CardHeader>
           <CardTitle>Order Details</CardTitle>
@@ -205,12 +200,14 @@ function EditOrderContent() {
               onChange={(e) =>
                 setForm({ ...form, order_number: e.target.value })
               }
+              error={errors.order_number}
               required
             />
             <Input
               label="Title *"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
+              error={errors.title}
               required
             />
             <Input
@@ -219,6 +216,7 @@ function EditOrderContent() {
               onChange={(e) =>
                 setForm({ ...form, description: e.target.value })
               }
+              error={errors.description}
             />
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Input
@@ -227,6 +225,7 @@ function EditOrderContent() {
                 onChange={(e) =>
                   setForm({ ...form, client_name: e.target.value })
                 }
+                error={errors.client_name}
                 required
               />
               <Input
@@ -235,6 +234,7 @@ function EditOrderContent() {
                 onChange={(e) =>
                   setForm({ ...form, client_phone: e.target.value })
                 }
+                error={errors.client_phone}
                 required
               />
             </div>
@@ -244,6 +244,7 @@ function EditOrderContent() {
               onChange={(e) =>
                 setForm({ ...form, client_address: e.target.value })
               }
+              error={errors.client_address}
               required
             />
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

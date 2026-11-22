@@ -68,10 +68,8 @@ function OrderDetailsContent() {
   const isNavigatingEdit = router.isNavigatingTarget("edit");
 
   const [loading, setLoading] = useState(true);
-  const [error, setErrorState] = useState("");
 
   const setError = (msg: string) => {
-    setErrorState(msg);
     if (msg) toast.error(msg);
   };
   const [order, setOrder] = useState<OrderWithEmployee | null>(null);
@@ -451,12 +449,6 @@ function OrderDetailsContent() {
           )}
         </div>
       </div>
-
-      {error && (
-        <div className="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      )}
 
       {/* Tabs */}
       <div className="mb-4 border-b border-gray-200">

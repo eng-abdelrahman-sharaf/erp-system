@@ -55,9 +55,7 @@ export default function ReportsPage() {
 
         if (whData) setWarehouses(whData);
         if (empData) {
-          setEmployees(
-            empData.map((e) => ({ id: e.id, name: e.full_name })),
-          );
+          setEmployees(empData.map((e) => ({ id: e.id, name: e.full_name })));
         }
       } catch (err) {
         console.error("Error loading filter options:", err);
@@ -88,13 +86,15 @@ export default function ReportsPage() {
       value: "inventory-activity" as const,
       label: "Inventory Activity Report",
       icon: Filter,
-      description: "Historical stock movement audit log and warehouse transfers",
+      description:
+        "Historical stock movement audit log and warehouse transfers",
     },
     {
       value: "employees" as const,
       label: "Employee Report",
       icon: User,
-      description: "Employee directory, assigned customer orders, and payroll summary",
+      description:
+        "Employee directory, assigned customer orders, and payroll summary",
     },
     {
       value: "payroll" as const,
@@ -124,9 +124,11 @@ export default function ReportsPage() {
 
       if (filters.startDate) queryParams.set("startDate", filters.startDate);
       if (filters.endDate) queryParams.set("endDate", filters.endDate);
-      if (filters.warehouseId) queryParams.set("warehouseId", filters.warehouseId);
+      if (filters.warehouseId)
+        queryParams.set("warehouseId", filters.warehouseId);
       if (filters.employeeId) queryParams.set("employeeId", filters.employeeId);
-      if (filters.orderStatus) queryParams.set("orderStatus", filters.orderStatus);
+      if (filters.orderStatus)
+        queryParams.set("orderStatus", filters.orderStatus);
 
       const endpoint = `/api/reports/${reportType}?${queryParams.toString()}`;
       const response = await fetch(endpoint, {

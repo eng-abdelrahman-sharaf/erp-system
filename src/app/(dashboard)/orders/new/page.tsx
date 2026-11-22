@@ -21,12 +21,8 @@ import { OrderCreateSchema } from "@/lib/validations";
 
 function NewOrderContent() {
   const router = useAppRouter();
-  const [error, setErrorState] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const setError = (msg: string) => {
-    setErrorState(msg);
-    if (msg) toast.error(msg);
-  };
   const [employees, setEmployees] = useState<
     { id: string; full_name: string }[]
   >([]);
@@ -53,7 +49,7 @@ function NewOrderContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
+    setErrors({});
 
     // Validate using Zod schema
     const validationResult = OrderCreateSchema.safeParse({
@@ -76,7 +72,7 @@ function NewOrderContent() {
           newErrors[issue.path[0] as string] = issue.message;
         }
       });
-      setError(newErrors[Object.keys(newErrors)[0]] || "Validation failed");
+      setErrors(newErrors);
       return;
     }
 
@@ -96,7 +92,9 @@ function NewOrderContent() {
       });
       router.push("/orders");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create order");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to create order",
+      );
       router.stopNavigation();
     }
   };
@@ -107,12 +105,6 @@ function NewOrderContent() {
         <BackButton />
         <h1 className="text-2xl font-bold text-gray-900">Create New Order</h1>
       </div>
-
-      {error && (
-        <div className="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      )}
 
       <Card>
         <CardHeader>
@@ -126,6 +118,7 @@ function NewOrderContent() {
               onChange={(e) =>
                 setForm({ ...form, order_number: e.target.value })
               }
+              error={errors.order_number}
               required
               placeholder="e.g., ORD-2024-001"
             />
@@ -133,6 +126,7 @@ function NewOrderContent() {
               label="Title *"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
+              error={errors.title}
               required
               placeholder="e.g., Website Development Project"
             />
@@ -142,6 +136,7 @@ function NewOrderContent() {
               onChange={(e) =>
                 setForm({ ...form, description: e.target.value })
               }
+              error={errors.description}
               placeholder="Order description..."
             />
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -151,6 +146,7 @@ function NewOrderContent() {
                 onChange={(e) =>
                   setForm({ ...form, client_name: e.target.value })
                 }
+                error={errors.client_name}
                 required
                 placeholder="Client company or person name"
               />
@@ -160,6 +156,7 @@ function NewOrderContent() {
                 onChange={(e) =>
                   setForm({ ...form, client_phone: e.target.value })
                 }
+                error={errors.client_phone}
                 placeholder="Client phone number"
                 required
               />

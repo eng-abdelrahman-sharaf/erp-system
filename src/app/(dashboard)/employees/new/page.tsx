@@ -21,7 +21,7 @@ import { EmployeeCreateSchema } from "@/lib/validations";
 
 function NewEmployeeContent() {
   const router = useAppRouter();
-  const [error, setErrorState] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [form, setForm] = useState({
     full_name: "",
@@ -58,14 +58,12 @@ function NewEmployeeContent() {
           newErrors[issue.path[0] as string] = issue.message;
         }
       });
-      setErrorState(
-        newErrors[Object.keys(newErrors)[0]] || "Validation failed",
-      );
+      setErrors(newErrors);
       return;
     }
 
     router.startNavigation("create");
-    setErrorState("");
+    setErrors({});
 
     try {
       const result = await createEmployee({
@@ -84,11 +82,11 @@ function NewEmployeeContent() {
         toast.success("Employee created successfully");
         router.push("/employees");
       } else {
-        setErrorState(result.error || "Failed to create employee");
+        toast.error(result.error || "Failed to create employee");
         router.stopNavigation();
       }
     } catch (err) {
-      setErrorState(
+      toast.error(
         err instanceof Error ? err.message : "Failed to create employee",
       );
       router.stopNavigation();
@@ -104,12 +102,6 @@ function NewEmployeeContent() {
         </h1>
       </div>
 
-      {error && (
-        <div className="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
       <Card>
         <CardHeader>
           <CardTitle>Employee Information</CardTitle>
@@ -123,6 +115,7 @@ function NewEmployeeContent() {
                 onChange={(e) =>
                   setForm({ ...form, full_name: e.target.value })
                 }
+                error={errors.full_name}
                 placeholder="e.g. John Doe"
                 required
               />
@@ -131,6 +124,7 @@ function NewEmployeeContent() {
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
+                error={errors.email}
                 placeholder="john@example.com"
                 required
               />
@@ -141,6 +135,7 @@ function NewEmployeeContent() {
                 label="Phone"
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                error={errors.phone}
                 placeholder="+1 (555) 000-0000"
                 required
               />
@@ -148,6 +143,7 @@ function NewEmployeeContent() {
                 label="Position"
                 value={form.position}
                 onChange={(e) => setForm({ ...form, position: e.target.value })}
+                error={errors.position}
                 placeholder="e.g. Warehouse Manager"
                 required
               />
@@ -161,6 +157,7 @@ function NewEmployeeContent() {
                 min="0"
                 value={form.salary}
                 onChange={(e) => setForm({ ...form, salary: e.target.value })}
+                error={errors.salary}
                 placeholder="0.00"
                 required
               />
@@ -205,6 +202,7 @@ function NewEmployeeContent() {
                 label="Address"
                 value={form.address}
                 onChange={(e) => setForm({ ...form, address: e.target.value })}
+                error={errors.address}
                 placeholder="e.g. 123 Main St, City"
                 required
               />

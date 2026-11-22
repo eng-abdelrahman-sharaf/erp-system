@@ -68,7 +68,7 @@ export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setErrorState] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deactivateTarget, setDeactivateTarget] = useState<Employee | null>(
     null,
@@ -79,7 +79,6 @@ export default function EmployeesPage() {
     router.isNavigatingTarget(`employee-${id}`);
 
   const setError = (msg: string) => {
-    setErrorState(msg);
     if (msg) toast.error(msg);
   };
 
@@ -90,8 +89,15 @@ export default function EmployeesPage() {
   >("all");
 
   // Modal state
-  const [showModal, setShowModal] = useState(false);
+  const [showModal, setShowModalState] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+
+  const setShowModal = (show: boolean) => {
+    setShowModalState(show);
+    if (!show) {
+      setErrors({});
+    }
+  };
   const [form, setForm] = useState({
     full_name: "",
     email: "",
@@ -117,7 +123,7 @@ export default function EmployeesPage() {
 
   const loadData = async (showLoading = true, pageNum = page) => {
     if (showLoading) setLoading(true);
-    setErrorState("");
+    setErrors({});
 
     const filters: {
       search?: string;
@@ -136,7 +142,7 @@ export default function EmployeesPage() {
       setEmployees(result.data as Employee[]);
       setTotal(result.total || 0);
     } else {
-      setError(result.error || "Failed to load employees");
+      toast.error(result.error || "Failed to load employees");
     }
 
     if (showLoading) setLoading(false);
@@ -178,7 +184,7 @@ export default function EmployeesPage() {
           newErrors[issue.path[0] as string] = issue.message;
         }
       });
-      setError(newErrors[Object.keys(newErrors)[0]] || "Validation failed");
+      setErrors(newErrors);
       return;
     }
 
@@ -222,7 +228,7 @@ export default function EmployeesPage() {
       loadData(false);
     } else {
       setEmployees(previousEmployees);
-      setError(result.error || "Failed to create employee");
+      toast.error(result.error || "Failed to create employee");
     }
   };
 
@@ -251,7 +257,7 @@ export default function EmployeesPage() {
           newErrors[issue.path[0] as string] = issue.message;
         }
       });
-      setError(newErrors[Object.keys(newErrors)[0]] || "Validation failed");
+      setErrors(newErrors);
       return;
     }
 
@@ -300,7 +306,7 @@ export default function EmployeesPage() {
       loadData(false);
     } else {
       setEmployees(previousEmployees);
-      setError(result.error || "Failed to update employee");
+      toast.error(result.error || "Failed to update employee");
     }
   };
 
@@ -425,12 +431,6 @@ export default function EmployeesPage() {
           {router.isNavigatingTarget("new") ? "Loading" : "Add Employee"}
         </Button>
       </div>
-
-      {error && (
-        <div className="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      )}
 
       <Card>
         <CardHeader>
@@ -627,6 +627,7 @@ export default function EmployeesPage() {
                   onChange={(e) =>
                     setForm({ ...form, full_name: e.target.value })
                   }
+                  error={errors.full_name}
                   required
                 />
                 <Input
@@ -634,12 +635,14 @@ export default function EmployeesPage() {
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  error={errors.email}
                   required
                 />
                 <Input
                   label="Phone"
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  error={errors.phone}
                   required
                 />
                 <Input
@@ -648,6 +651,7 @@ export default function EmployeesPage() {
                   onChange={(e) =>
                     setForm({ ...form, address: e.target.value })
                   }
+                  error={errors.address}
                   required
                 />
                 <Input
@@ -656,6 +660,7 @@ export default function EmployeesPage() {
                   onChange={(e) =>
                     setForm({ ...form, position: e.target.value })
                   }
+                  error={errors.position}
                   required
                 />
                 <Input
@@ -664,6 +669,7 @@ export default function EmployeesPage() {
                   step="0.01"
                   value={form.salary}
                   onChange={(e) => setForm({ ...form, salary: e.target.value })}
+                  error={errors.salary}
                   required
                 />
                 <div className="flex flex-col gap-1.5">

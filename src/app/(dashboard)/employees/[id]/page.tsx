@@ -128,15 +128,21 @@ function EmployeeDetailsContent() {
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [payrollLoading, setPayrollLoading] = useState(true);
   const [paymentsLoading, setPaymentsLoading] = useState(true);
-  const [error, setErrorState] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [deletePayrollId, setDeletePayrollId] = useState<string | null>(null);
 
   const setError = (msg: string) => {
-    setErrorState(msg);
     if (msg) toast.error(msg);
   };
 
-  const [showEditModal, setShowEditModal] = useState(false);
+  const [showEditModal, setShowEditModalState] = useState(false);
+
+  const setShowEditModal = (show: boolean) => {
+    setShowEditModalState(show);
+    if (!show) {
+      setErrors({});
+    }
+  };
   const [editForm, setEditForm] = useState({
     full_name: "",
     email: "",
@@ -194,7 +200,7 @@ function EmployeeDetailsContent() {
         notes: result.data.notes || "",
       });
     } else {
-      setError(result.error || "Failed to load employee");
+      toast.error(result.error || "Failed to load employee");
     }
   };
 
@@ -324,7 +330,7 @@ function EmployeeDetailsContent() {
           newErrors[issue.path[0] as string] = issue.message;
         }
       });
-      setError(newErrors[Object.keys(newErrors)[0]] || "Validation failed");
+      setErrors(newErrors);
       return;
     }
 
@@ -363,7 +369,7 @@ function EmployeeDetailsContent() {
       loadEmployee();
     } else {
       setEmployee(previousEmployee);
-      setError(result.error || "Failed to update employee");
+      toast.error(result.error || "Failed to update employee");
     }
   };
 
@@ -561,11 +567,6 @@ function EmployeeDetailsContent() {
           Edit Employee
         </Button>
       </div>
-      {error && (
-        <div className="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      )}
       <div className="mb-6 border-b border-gray-200">
         <nav className="flex gap-4">
           {[
@@ -962,6 +963,7 @@ function EmployeeDetailsContent() {
                   onChange={(e) =>
                     setEditForm({ ...editForm, full_name: e.target.value })
                   }
+                  error={errors.full_name}
                   required
                 />
                 <Input
@@ -971,6 +973,7 @@ function EmployeeDetailsContent() {
                   onChange={(e) =>
                     setEditForm({ ...editForm, email: e.target.value })
                   }
+                  error={errors.email}
                   required
                 />
                 <Input
@@ -979,6 +982,7 @@ function EmployeeDetailsContent() {
                   onChange={(e) =>
                     setEditForm({ ...editForm, phone: e.target.value })
                   }
+                  error={errors.phone}
                   required
                 />
                 <Input
@@ -987,6 +991,7 @@ function EmployeeDetailsContent() {
                   onChange={(e) =>
                     setEditForm({ ...editForm, address: e.target.value })
                   }
+                  error={errors.address}
                   required
                 />
                 <Input
@@ -995,6 +1000,7 @@ function EmployeeDetailsContent() {
                   onChange={(e) =>
                     setEditForm({ ...editForm, position: e.target.value })
                   }
+                  error={errors.position}
                   required
                 />
                 <Input
@@ -1005,6 +1011,7 @@ function EmployeeDetailsContent() {
                   onChange={(e) =>
                     setEditForm({ ...editForm, salary: e.target.value })
                   }
+                  error={errors.salary}
                   required
                 />
                 <div className="flex flex-col gap-1.5">
